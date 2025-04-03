@@ -23,3 +23,14 @@ NOTE - make sure that the bottoms of the halves (especially for the base parts) 
 Use clamps judiciously to make sure the parts are glued securely
 Tight the screws through the two sides as you work your way up the tower
 
+Shank Shield Installation
+2 x Pan head M4*12 or *16 self-tapping screws for the top of the shield (avoid counter-sinking, but could also use flat-head)
+2 x flat head self-tapping M4*12 or *14 screws for the bottom of the shield
+Put the shield in place and mark where the upper-left hold should be that goes into the top-left riser of the tower frontplate
+Drill a hole in the shield using a 5/32" drill bit or something else that is very nearly as wide as the screw threads
+WARNING - it's very easy to shatter or chip the shield when screwing in the screws.  For that reason, the holes must be nearly as large (or even larger) than the screws.  This may compromise the rigidity of the lower-shield mount, but better than a cracked shield.
+WARNING - Plexiglas or polycarbonite is very sharp.  Make sure you sand everything.
+Mount the shield using just the top-left screw.  Using a 1/8" (or other small bit), drill through the sheild in the top-right where tthe shield will mount into the top-right tower riser.  
+Drill (straigh) through the two counter-sunk shield-securing holes in the front of the base-box.  The reasons for using the smaller bit is sot that there is enough plastic in the basebox hole to tightly grip the screw.
+Unattach the shield, put it on something you can drill into, and drill out the three new holes with a 5/32" drill.
+Attach the shield using the four screws listed above.
