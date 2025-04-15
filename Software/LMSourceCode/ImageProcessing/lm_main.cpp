@@ -21,6 +21,7 @@
 #include "gs_ui_system.h"
 #include "gs_config.h"
 #include "gs_results.h"
+#include "gs_camera.h"
 
 #include "logging_tools.h"
 #include "colorsys.h"
@@ -36,6 +37,7 @@
 #include "gs_gspro_response.h"
 #include "gs_sim_interface.h"
 #include "gs_e6_interface.h"
+#include "gs_automated_testing.h"
 
 #include "gs_fsm.h"
 #include "gs_ipc_system.h"
@@ -198,7 +200,7 @@ void test_calibrated_location(std::string twoFootImgName, std::string threeFootI
     GolfSimCamera c;
     GolfBall b;
 
-    std::vector<cv::Vec3d> camera_positions_from_origin = std::vector<cv::Vec3d>({ GolfSimCamera::kCamera1PositionsFromOriginMeters, GolfSimCamera::kCamera2PositionsFromOriginMeters });
+    std::vector<cv::Vec3d> camera_positions_from_origin = std::vector<cv::Vec3d>({ GolfSimCamera::kCamera1PositionsFromExpectedBallMeters, GolfSimCamera::kCamera2PositionsFromExpectedBallMeters });
     bool success = c.GetCalibratedBall(c, img, b);
 
     // Now, test the calibration by seeing if the same ball can be found using the calibrated ball
@@ -299,406 +301,6 @@ void showVisualization() {
     */
 }
 
-cv::Mat undistort_image(const cv::Mat& img, CameraHardware::CameraModel cameraModel) {
-    // Get a camera object just to be able to get the calibration values
-    GolfSimCamera c;
-    c.camera_.resolution_x_override_ = img.cols;
-    c.camera_.resolution_y_override_ = img.rows;
-    c.camera_.init_camera_parameters(GsCameraNumber::kGsCamera1, cameraModel);
-    cv::Mat cameracalibrationMatrix = c.camera_.calibrationMatrix;
-    cv::Mat cameraDistortionVector = c.camera_.cameraDistortionVector;
-
-    cv::Mat unDistortedBall1Img;
-    cv::Mat m_undistMap1, m_undistMap2;
-    // TBD - is the size rows, cols?  or cols, rows?
-    cv::initUndistortRectifyMap(cameracalibrationMatrix, cameraDistortionVector, cv::Mat(), cameracalibrationMatrix, cv::Size(img.cols, img.rows), CV_32FC1, m_undistMap1, m_undistMap2);
-    cv::remap(img, unDistortedBall1Img, m_undistMap1, m_undistMap2, cv::INTER_LINEAR);
-
-    return unDistortedBall1Img;
-}
-
-bool read_test_images(const std::string& img1BaseFileName, const std::string& img2BaseFileName, cv::Mat& ball1Img, cv::Mat& ball2Img, cv::Mat& ball1ImgColor, cv::Mat& ball2ImgColor, 
-                                CameraHardware::CameraModel cameraModel, bool undistort = true) {
-
-    // We prefer the command-line setting even if there's one in the .json config file
-    if (!GolfSimOptions::GetCommandLineOptions().base_image_logging_dir_.empty()) {
-        kBaseTestDir = GolfSimOptions::GetCommandLineOptions().base_image_logging_dir_;
-    }
-    else {
-        // Attempt to get the image logging directory from the .json config file
-#ifdef __unix__
-        GolfSimConfiguration::SetConstant("gs_config.logging.kLinuxBaseImageLoggingDir", kBaseTestDir);
-#else
-        GolfSimConfiguration::SetConstant("gs_config.logging.kPCBaseImageLoggingDir", kBaseTestDir);
-#endif
-    }
-
-    // If a base directory for test images exists, use it to override the kBaseTestDir
-    std::string separate_base_test_dir;
-    GolfSimConfiguration::SetConstant("gs_config.testing.kBaseTestImageDir", separate_base_test_dir);
-    if (!separate_base_test_dir.empty()) {
-        kBaseTestDir = separate_base_test_dir;
-    }
-
-
-    std::string img1FileName = kBaseTestDir + img1BaseFileName;
-    std::string img2FileName = kBaseTestDir + img2BaseFileName;
-
-    GS_LOG_TRACE_MSG(trace, "Raw Image1: " + img1FileName);
-    GS_LOG_TRACE_MSG(trace, "Raw Image2: " + img2FileName);
-
-    ball1Img = cv::imread(img1FileName, cv::IMREAD_COLOR);
-    ball2Img = cv::imread(img2FileName, cv::IMREAD_COLOR);
-
-    if (ball1Img.empty() || ball2Img.empty()) {
-        return false;
-    }
-
-    // Use whatever (simulated) resolution we find in the image files we just read
-    CameraHardware::resolution_x_override_ = ball1Img.cols;
-    CameraHardware::resolution_y_override_ = ball1Img.rows;
-
-    LoggingTools::DebugShowImage("Original1: " + img1FileName, ball1Img);
-    LoggingTools::DebugShowImage("Original2: " + img2FileName, ball2Img);
-
-    cv::Mat unDistortedBall1Img;
-    cv::Mat unDistortedBall2Img;
-
-    // TBD - Need to get a better distortion matrix for GS camera
-    /*
-    if (cameraModel == CameraHardware::PiGSCam6mmWideLens) {
-        LoggingTools::Warning("No distortion matrix for PiGSCam6mmWideLens.");
-        undistort = false;
-    }
-    */
-
-    if (undistort) {
-        unDistortedBall1Img = undistort_image(ball1Img, cameraModel);
-        unDistortedBall2Img = undistort_image(ball2Img, cameraModel);
-
-        // Show the center point to help aim the camera
-        LoggingTools::DebugShowImage("Undistorted " + img1FileName, unDistortedBall1Img, std::vector<cv::Point>({ cv::Point(ball1Img.cols / 2, ball1Img.rows / 2) }));
-        LoggingTools::DebugShowImage("Undistorted " + img2FileName, unDistortedBall2Img, std::vector<cv::Point>({ cv::Point(ball1Img.cols / 2, ball1Img.rows / 2) }));
-    }
-    else {
-        unDistortedBall1Img = ball1Img;
-        unDistortedBall2Img = ball2Img;
-    }
-
-    ball1ImgColor = unDistortedBall1Img;
-    ball2ImgColor = unDistortedBall2Img;
-
-    cv::Mat ball1ImgGray;
-    cv::cvtColor(unDistortedBall1Img, ball1ImgGray, cv::COLOR_BGR2GRAY);
-    cv::Mat ball2ImgGray;
-    cv::cvtColor(unDistortedBall2Img, ball2ImgGray, cv::COLOR_BGR2GRAY);
-
-    ball1Img = ball1ImgGray;
-    ball2Img = ball2ImgGray;
-
-    return true;
-}
-
-
-bool absResultsPass(const cv::Vec2d& expected, const cv::Vec2d& result, const cv::Vec2d& absTolerances) {
-    bool pass = true;
-
-    if (std::abs(expected[0] - result[0]) > absTolerances[0]) {
-        pass = false;
-    }
-
-    if (std::abs(expected[1] - result[1]) > absTolerances[1]) {
-        pass = false;
-    }
-
-    return pass;
-}
-
-
-bool absResultsPass(const cv::Vec3d& expected, const cv::Vec3d& result, const cv::Vec3d& absTolerances) {
-    bool pass = true;
-
-    if (std::abs(expected[0] - result[0]) > absTolerances[0]) {
-        pass = false;
-    }
-
-    if (std::abs(expected[1] - result[1]) > absTolerances[1]) {
-        pass = false;
-    }
-
-    if (std::abs(expected[2] - result[2]) > absTolerances[2]) {
-        pass = false;
-    }
-
-    return pass;
-}
-
-
-
-struct LocationAndSpinTestScenario {
-    int testIndex = 0;
-    std::string img1;
-    std::string img2;
-    CameraHardware::CameraModel cameraModel;
-    std::vector<cv::Vec3d> camera_positions_from_origin;  // In meters.  Size=2, one vector for each image.  If same, then only one camera position was used.
-    cv::Vec2i calibrationBallCenter;        // The x,y coordinates of where the first ball's picture should concentrate as an ROI
-    cv::Vec3d expectedposition_deltas_ball_perspective_;
-    cv::Vec2d expectedXYBallAngleDegrees;
-    cv::Vec3d expectedXYz_rotation_degreesationDegrees;
-};
-
-
-const cv::Vec3d  kRotationAngleToleranceAbs = { 10, 10, 5 };
-const cv::Vec3d  kDeltaLocationBallToleranceAbs = { 1, 1, 1 };
-const cv::Vec2d  kLaunchAngleToleranceAbs = { 10, 10 };
-
-
-
-void convertInchesToMeters(const cv::Vec3d& expectedPositionsInches, cv::Vec3d& expectedPositionsMeters) {
-    expectedPositionsMeters[0] = CvUtils::InchesToMeters(expectedPositionsInches[0]);
-    expectedPositionsMeters[1] = CvUtils::InchesToMeters(expectedPositionsInches[1]);
-    expectedPositionsMeters[2] = CvUtils::InchesToMeters(expectedPositionsInches[2]);
-}
-
-
-
-bool testBallPosition() {
-
-    LocationAndSpinTestScenario tests[] {
-
-
-        { 25, "test_3280w_BS_camoff04x_8.5y_20z_ball00z_02y_00degx_spin00z_v1.png", "test_3280w_camoff04x_8.5y_20z_ball10z_03y_15degx_spin30z_v1.png",
-            CameraHardware::CameraModel::PiCam2, std::vector<cv::Vec3d>({cv::Vec3d(0.1016, 0.2159, 0.508), cv::Vec3d(0.1016, 0.2159, 0.508)}), cv::Vec2i(1100, 1000), cv::Vec3d(3, 2, 10), cv::Vec2d(45, 7), cv::Vec3d(0, 0, 30)
-        },
-
-        { 20, "test_pos_4056w_cam04offx_14y_17z_Ball_0inz_00degx_00iny_00Zsp_00.png", "test_pos_4056w_cam04offx_14y_17z_Ball_10inz_10degx_00iny_30Zsp_00.png",
-            CameraHardware::CameraModel::PiHQCam6mmWideLens, std::vector<cv::Vec3d>({cv::Vec3d(0.1016, 0.3556, 0.4318), cv::Vec3d(.1016, 0.3556, 0.4318)}), cv::Vec2i(1100, 2000), cv::Vec3d(6.5, -2, -1.5), cv::Vec2d(13, 0), cv::Vec3d(4, -2, 30)
-        },
-
-        { 30, "IRtest02.1-filter.png", "IRtest02.2-filter.png",
-            CameraHardware::CameraModel::PiHQCam6mmWideLens, std::vector<cv::Vec3d>({cv::Vec3d(.0914, 0.0953, 0), cv::Vec3d(.0914, 0.0953, 0)}), cv::Vec2i(1400, 800), cv::Vec3d(6.5, -2, -1.5), cv::Vec2d(13, 0), cv::Vec3d(4, -2, 30)
-        },
-
-        { 21, "test_pos_4056w_cam04offx_14y_17z_Ball_0inz_00degx_00iny_00Zsp_00.png", "test_pos_4056w_cam04offx_3.5y_19x_Ball15inz_15degx_00iny_40Zsp_00.png",
-            CameraHardware::CameraModel::PiHQCam6mmWideLens, std::vector<cv::Vec3d>({cv::Vec3d(.0914, 0.0953, 0), cv::Vec3d(.0914, 0.0953, 0)}), cv::Vec2i(1100, 2000), cv::Vec3d(6.5, -2, -1.5), cv::Vec2d(13, 0), cv::Vec3d(4, -2, 30)
-        },
-
-
-        /* These next two are too unfocused to work well and will likely fail */
-        { 1, "test_pos_2592w_BASE6off_22Dist_00inz_00degx_00iny_00.png", "test_pos_2592w_6off_22Dist_15inz_20degx_3iny_00.png",
-                CameraHardware::CameraModel::PiCam2, std::vector<cv::Vec3d>({cv::Vec3d(.0914, 0, 0), cv::Vec3d(.0914, 0, 0)}), cv::Vec2i(700, 1000), cv::Vec3d(0, 0, 0), cv::Vec2d(-20, 0), cv::Vec3d(0, 0, 0)
-        },
-        { 2, "test_pos_BS_3280w_6off_22Dist_00inz_00degx_0iny_00_00s.png", "test_pos_3280w_6off_22Dist_15inz_10degx_3iny_00_90s.png",
-                CameraHardware::CameraModel::PiCam2, std::vector<cv::Vec3d>({cv::Vec3d(.0914, 0, 0), cv::Vec3d(.0914, 0, 0)}), cv::Vec2i(800, 1200), cv::Vec3d(0, 0, 0), cv::Vec2d(0, 0), cv::Vec3d(0, 0, 0)
-        },
-
-        { 22, "tt.png", "t.png",
-            CameraHardware::CameraModel::PiHQCam6mmWideLens, std::vector<cv::Vec3d>({cv::Vec3d(.0914, 0.0953, 0), cv::Vec3d(.0914, 0.0953, 0)}), cv::Vec2i(1100, 1000), cv::Vec3d(6.5, -2, -1.5), cv::Vec2d(13, 0), cv::Vec3d(4, -2, 30)
-        },
-        { 0, "test_pos_BS_3280w_03off_20Dist_00inz_00degx_01iny_00sp_Y00_blur.png", "test_pos_3280w_03off_20Dist_06inz_15degx_01iny_30sp_Y00.png",
-            CameraHardware::CameraModel::PiCam2, std::vector<cv::Vec3d>({cv::Vec3d(.0914, 0, 0), cv::Vec3d(.0914, 0, 0)}), cv::Vec2i(1100, 1400), cv::Vec3d(6.5, -2, -1.5), cv::Vec2d(13, 0), cv::Vec3d(4, -2, 30)
-        },
-        { 4, "test_ball_spin_strong_landmarks_00d_3280w_dark_00.png", "test_ball_spin_strong_landmarks_20d_3280w_dark_00.png",
-            CameraHardware::CameraModel::PiCam2, std::vector<cv::Vec3d>({cv::Vec3d(.0914, 0, 0), cv::Vec3d(.0914, 0, 0)}), cv::Vec2i(1400, 1100), cv::Vec3d(0, 0, 0), cv::Vec2d(0, 0), cv::Vec3d(0, 0, 32)
-        },
-
-        /* These are better-focused and should work */
-        { 11, "test_pos_BS_3280w_0off_18Dist_00inz_00degx_01iny_00sp_04.png", "test_pos_3280w_13off_18Dist_15inz_15degx_01iny_00sp_04.png",
-            CameraHardware::CameraModel::PiCam2, std::vector<cv::Vec3d>({cv::Vec3d(0, 0, 0), cv::Vec3d(.33, 0, 0)}), cv::Vec2i(1400, 1100), cv::Vec3d(0.0925, -0.025, 0.381), cv::Vec2d(-15, 3), cv::Vec3d(0, 0, 0)
-        },
-        { 15, "test_pos_BS_3280w_03off_20Dist_00inz_00degx_01iny_00sp_Y00.png", "test_pos_3280w_03off_20Dist_06inz_10degx_01iny_30sp_Y00.png",
-            CameraHardware::CameraModel::PiCam2, std::vector<cv::Vec3d>({cv::Vec3d(0.0762, 0, 0), cv::Vec3d(0.0762, 0, 0)}), cv::Vec2i(1300, 1100), cv::Vec3d(0.030, -0.038, 0.152), cv::Vec2d(-10, 4), cv::Vec3d(0, 0, 30)
-        },
-        { 5, "test_pos_BS_3280w_03off_20Dist_00inz_00degx_01iny_00sp_Y00.png", "test_pos_3280w_03off_20Dist_06inz_10degx_01iny_00sp_Y00.png",
-            CameraHardware::CameraModel::PiCam2, std::vector<cv::Vec3d>({cv::Vec3d(.0914, 0, 0), cv::Vec3d(.0914, 0, 0)}), cv::Vec2i(1200, 1100), cv::Vec3d(0.0, 0.025, 0.152), cv::Vec2d(15, 9.462), cv::Vec3d(0, 0, 0)
-        },
-        { 3, "test_pos_2592w_BASE6off_22Dist_00inz_00degx_00iny_00.png", "test_pos_2592w_6off_22Dist_10inz_30degx_.75iny_00.png",
-            CameraHardware::CameraModel::PiCam2, std::vector<cv::Vec3d>({cv::Vec3d(.0914, 0, 0), cv::Vec3d(.0914, 0, 0)}), cv::Vec2i(800, 1000), cv::Vec3d(0, 0, 0), cv::Vec2d(0, 0), cv::Vec3d(0, 0, 0)
-        },
-        /* Clean pictures against a bllck back drop.  This should be easy */
-        { 7, "test_pos_BS_3280w_0off_18Dist_00inz_00degx_01iny_00sp_04.png", "test_pos_3280w_13off_18Dist_15inz_15degx_01iny_30z20ysp_04.png",
-            CameraHardware::CameraModel::PiCam2, std::vector<cv::Vec3d>({cv::Vec3d(0, 0, 0), cv::Vec3d(.33, 0, 0)}), cv::Vec2i(1400, 1100), cv::Vec3d(0.0925, -0.025, 0.381), cv::Vec2d(-15, 3), cv::Vec3d(0, 0, 26)
-        },
-        /* Some tests that use only one camera */
-        { 13, "test_pos_BS_3280w_03off_20Dist_00inz_00degx_01iny_00sp_Y00.png", "test_pos_3280w_03off_20Dist_06inz_15degx_01.25iny_15sp_Y00.png",
-            CameraHardware::CameraModel::PiCam2, std::vector<cv::Vec3d>({cv::Vec3d(0.0762, 0, 0), cv::Vec3d(0.0762, 0, 0)}), cv::Vec2i(1300, 1100), cv::Vec3d(0.038, -0.038, 0.152), cv::Vec2d(-15, 4), cv::Vec3d(5, 0, 15)
-        },
-        /*  Shadow hits the ball and creates a line - seems to screw up the spin analysis*/
-        { 12, "test_pos_BS_3280w_03off_20Dist_00inz_00degx_01iny_00sp_Y00.png", "test_pos_3280w_03off_20Dist_06inz_15degx_01.25iny_15sp_Y00_shdw.png",
-            CameraHardware::CameraModel::PiCam2, std::vector<cv::Vec3d>({cv::Vec3d(0.0762, 0, 0), cv::Vec3d(0.0762, 0, 0)}), cv::Vec2i(1300, 1100), cv::Vec3d(0.038, -0.038, 0.152), cv::Vec2d(-15, 4), cv::Vec3d(0, 0, 15)
-        },
-        { 14, "test_pos_BS_3280w_03off_20Dist_00inz_00degx_01iny_00sp_Y00.png", "test_pos_3280w_03off_20Dist_06inz_15degx_01iny_30sp_Y00.png",
-            CameraHardware::CameraModel::PiCam2, std::vector<cv::Vec3d>({cv::Vec3d(0.0762, 0, 0), cv::Vec3d(0.0762, 0, 0)}), cv::Vec2i(1300, 1100), cv::Vec3d(0.038, -0.038, 0.152), cv::Vec2d(-15, 4), cv::Vec3d(5, 0, 30)
-        },
-        { 16, "test_pos_BS_3280w_03off_20Dist_00inz_00degx_01iny_00sp_Y00.png", "test_pos_3280w_03off_20Dist_06inz_00degx_01iny_30sp_Y00.png",
-            CameraHardware::CameraModel::PiCam2, std::vector<cv::Vec3d>({cv::Vec3d(0.0762, 0, 0), cv::Vec3d(0.0762, 0, 0)}), cv::Vec2i(1300, 1100), cv::Vec3d(0.0, -0.038, 0.152), cv::Vec2d(0, 4), cv::Vec3d(0, 0, 30)
-        },
-
-
-
-        /* Same ball picture - should return zeros for everything */
-        { 8, "test_pos_BS_3280w_0off_18Dist_00inz_00degx_01iny_00sp_04.png", "test_pos_BS_3280w_0off_18Dist_00inz_00degx_01iny_00sp_04.png",
-            CameraHardware::CameraModel::PiCam2, std::vector<cv::Vec3d>({cv::Vec3d(0, 0, 0), cv::Vec3d(0, 0, 0)}), cv::Vec2i(1400, 1100), cv::Vec3d(0.0, 0.0, 0.0), cv::Vec2d(0, 0), cv::Vec3d(0, 0, 0)
-        },
-        /* Clean pictures against a black back drop.  This should be easy */
-        { 9, "test_pos_BS_3280w_0off_18Dist_00inz_00degx_01iny_00sp_04.png", "test_pos_3280w_13off_18Dist_15inz_15degx_01iny_30z00ysp_04.png",
-            CameraHardware::CameraModel::PiCam2, std::vector<cv::Vec3d>({cv::Vec3d(0, 0, 0), cv::Vec3d(.33, 0, 0)}), cv::Vec2i(1400, 1100), cv::Vec3d(0.0925, -0.025, 0.381), cv::Vec2d(-15, 3), cv::Vec3d(0, 0, 30)
-        },
-        { 10, "test_pos_BS_3280w_0off_18Dist_00inz_00degx_01iny_00sp_04.png", "test_pos_3280w_13off_18Dist_15inz_15degx_01iny_30z00ysp_04_F.png",
-            CameraHardware::CameraModel::PiCam2, std::vector<cv::Vec3d>({cv::Vec3d(0, 0, 0), cv::Vec3d(.33, 0, 0)}), cv::Vec2i(1400, 1100), cv::Vec3d(0.0925, -0.025, 0.381), cv::Vec2d(-15, 3), cv::Vec3d(0, 0, 30)
-        },
-        { 6, "test_ball_spin_strong_landmarks_00d_2592w_bright_00.png", "test_ball_spin_strong_landmarks_45d_2592w_bright_00.png",
-            CameraHardware::CameraModel::PiCam2, std::vector<cv::Vec3d>({ cv::Vec3d(.0914, 0, 0), cv::Vec3d(.0914, 0, 0) }), cv::Vec2i(1200, 1000), cv::Vec3d(0.0, 0.0, 0.0), cv::Vec2d(0.0, 0.0), cv::Vec3d(0, 0, 45)
-        },
-    };
-
-    /*  TBD - this lower resolution is not working for spin detection right now - FIX! 
-    // ALREADY ABOVE const std::string k0_DegreeBallFileName_00 = "test_pos_2592w_BASE6off_22Dist_00inz_00degx_00iny_00.png";
-    // const std::string kUnknown_DegreeBallFileName_00 = "test_pos_2592w_6off_22Dist_15inz_20degx_3iny_00.png";
-    const std::string kUnknown_DegreeBallFileName_00 = "test_pos_2592w_6off_22Dist_10inz_30degx_.75iny_00.png";
-
-    const std::string k0_DegreeBallFileName_00 = "test_pos_BS_3280w_6off_22Dist_00inz_00degx_0iny_00_00s.png";
-    const std::string kUnknown_DegreeBallFileName_00 = "test_pos_3280w_6off_22Dist_15inz_10degx_3iny_00_90s.png";
-
-    // Last trying this...
-    const std::string k0_DegreeBallFileName_00 = "test_pos_BS_3280w_6off_20Dist_00inz_00degx_1iny_00sp_00.png";
-    const std::string kUnknown_DegreeBallFileName_00 = "test_pos_BS_3280w_6off_20Dist_10inz_20degx_3iny_30sp_00.png";
-
-    const std::string k0_DegreeBallFileName_00 = "test_ball_spin_strong_landmarks_00d_2592w_bright_00.png";
-    const std::string kUnknown_DegreeBallFileName_00 = "test_ball_spin_strong_landmarks_45d_2592w_bright_00.png";
-
-    const std::string k0_DegreeBallFileName_00 = "test_pos_BS_3280w_0off_18Dist_00inz_00degx_01iny_00sp_03.png";
-    const std::string kUnknown_DegreeBallFileName_00 = "test_pos_BS_3280w_13off_18Dist_15inz_00degx_03iny_30sp_03.png";
-    // The (simulated) camera and ball position will depend on the test images we use, above.
-    cv::Vec3d camera_positions_from_origin{ 0.33 ,0.0, 0.0 };  // In meters
-    cv::Vec2i calibrationBallCenter{ 1500, 1200 };
-
-    const std::string k0_DegreeBallFileName_00 = "test_pos_BS_3280w_0off_18Dist_00inz_00degx_01iny_00sp_04.png";
-    const std::string kUnknown_DegreeBallFileName_00 = "test_pos_BS_3280w_13off_18Dist_15inz_15degx_01iny_30z20ysp_04.png";
-
-    const std::string k0_DegreeBallFileName_00 = "test_pos_BS_3280w_0off_20Dist_00inz_00degx_00iny_00sp_Y00.png";
-    const std::string kUnknown_DegreeBallFileName_00 = "test_pos_BS_3280w_13off_20Dist_00inz_05degx_01iny_45sp_Y00.png";
-    cv::Vec3d camera_positions_from_origin{ 0.33 ,0.0, 0.0 };  // In meters
-    cv::Vec2i calibrationBallCenter{ 1500, 1200 };
-
-    const std::string k0_DegreeBallFileName_00 = "test_ball_spin_strong_landmarks_00d_2592w_bright_00.png";
-    const std::string kUnknown_DegreeBallFileName_00 = "test_ball_spin_strong_landmarks_45d_2592w_bright_00.png";
-    cv::Vec3d camera_positions_from_origin{ 0.0 ,0.0, 0.0 };  // In meters
-    cv::Vec2i calibrationBallCenter{ 1200, 1000 };
-
-    // ABOVE const std::string k0_DegreeBallFileName_00 = "test_pos_BS_3280w_03off_20Dist_00inz_00degx_01iny_00sp_Y00_blur.png";
-    const std::string kUnknown_DegreeBallFileName_00 = "test_pos_3280w_03off_20Dist_06inz_15degx_01iny_30sp_Y00.png";
-    // The (simulated) camera and ball position will depend on the test images we use, above.
-    cv::Vec3d camera_positions_from_origin{ 0.0 ,0.0, 0.0 };  // In meters
-    cv::Vec2i calibrationBallCenter{ 1300, 1200 };
-
-    */
-
-    boost::timer::cpu_timer timer1;
-
-    bool allTestsPassed = true;
-    int numTotalTests = 0;
-    int numTestsFailed = 0;
-
-    for (auto& t : tests) {
-
-        numTotalTests++;
-
-        const std::string k0_DegreeBallFileName_00 = t.img1;
-        const std::string kUnknown_DegreeBallFileName_00 = t.img2;
-        // The (simulated) camera and ball position will depend on the test images we use, above.
-        std::vector<cv::Vec3d> camera_positions_from_origin = t.camera_positions_from_origin;  // In meters
-        cv::Vec2i calibrationBallCenter = t.calibrationBallCenter;
-
-
-        cv::Mat ball1ImgGray;
-        cv::Mat ball2ImgGray;
-        cv::Mat ball1ImgColor;
-        cv::Mat ball2ImgColor;
-        if (!read_test_images(k0_DegreeBallFileName_00, kUnknown_DegreeBallFileName_00, ball1ImgGray, ball2ImgGray, ball1ImgColor, ball2ImgColor, t.cameraModel)) {
-            GS_LOG_TRACE_MSG(trace, "Failed to read valid images for Test No. " + std::to_string(t.testIndex));
-            numTestsFailed++;
-            continue;
-        }
-
-
-        GolfSimCamera c;
-        c.camera_.resolution_x_ = ball1ImgColor.cols;
-        c.camera_.resolution_y_ = ball1ImgColor.rows;
-        c.camera_.resolution_x_override_ = ball1ImgColor.cols;
-        c.camera_.resolution_y_override_ = ball1ImgColor.rows;
-
-        // Just for development on a non-Raspberry-Pi machine
-        c.camera_.firstCannedImageFileName = kBaseTestDir + k0_DegreeBallFileName_00;
-        c.camera_.secondCannedImageFileName = kBaseTestDir + kUnknown_DegreeBallFileName_00;
-        c.camera_.firstCannedImage = ball1ImgColor;
-        c.camera_.secondCannedImage = ball2ImgColor;
-        c.camera_.init_camera_parameters(GsCameraNumber::kGsCamera1, t.cameraModel);
-
-        long timeDelayuS = 7000;
-        GolfBall result_ball;
-
-        GS_LOG_TRACE_MSG(trace, "Starting Test No. " + std::to_string(t.testIndex) + ".");
-
-        if (!c.analyzeShotImages(c, ball1ImgColor, ball2ImgColor,
-            timeDelayuS,
-            camera_positions_from_origin,
-            result_ball,
-            calibrationBallCenter)) {
-            GS_LOG_TRACE_MSG(trace, "Failed Test No. " + std::to_string(t.testIndex));
-            continue;
-        }
-
-        double ball_velocity_meters_per_second_ = result_ball.velocity_;
-
-        result_ball.PrintBallFlightResults();
-
-        bool testPassed = true;
-
-        if (!absResultsPass(t.expectedXYz_rotation_degreesationDegrees, result_ball.ball_rotation_angles_camera_ortho_perspective_, kRotationAngleToleranceAbs)) {
-            GS_LOG_TRACE_MSG(trace, "Test No. " + std::to_string(t.testIndex) + " - Failed ball rotation measurement.");
-            GS_LOG_TRACE_MSG(trace, "    Expected X,Y,Z rotation angles (in degrees) are: " + std::to_string((t.expectedXYz_rotation_degreesationDegrees[0])) + ", " +
-                std::to_string((t.expectedXYz_rotation_degreesationDegrees[1])) + ", " + std::to_string((t.expectedXYz_rotation_degreesationDegrees[2])));
-            testPassed = false;
-        }
-
-        cv::Vec3d expectedPositionsMeters;
-        convertInchesToMeters(t.expectedposition_deltas_ball_perspective_, expectedPositionsMeters);
-
-        if (!absResultsPass(expectedPositionsMeters, result_ball.position_deltas_ball_perspective_, kDeltaLocationBallToleranceAbs)) {
-            GS_LOG_TRACE_MSG(trace, "Test No. " + std::to_string(t.testIndex) + " - Failed ball delta location measurement.");
-            GS_LOG_TRACE_MSG(trace, "    Expected X,Y,Z deltas (ball perspective in inches) are: " + std::to_string(CvUtils::MetersToInches(t.expectedposition_deltas_ball_perspective_[0])) + ", " +
-                std::to_string(CvUtils::MetersToInches(t.expectedposition_deltas_ball_perspective_[1])) + ", " + std::to_string(CvUtils::MetersToInches(t.expectedposition_deltas_ball_perspective_[2])));
-            testPassed = false;
-        }
-
-        if (!absResultsPass(t.expectedXYBallAngleDegrees, result_ball.angles_ball_perspective_, kLaunchAngleToleranceAbs)) {
-            GS_LOG_TRACE_MSG(trace, "Test No. " + std::to_string(t.testIndex) + " - Failed ball launch angle measurement.");
-            GS_LOG_TRACE_MSG(trace, "    Expected X,Y launch angles (ball perspective) (in degrees) are: " + std::to_string(t.expectedXYBallAngleDegrees[0]) + ", " +
-                std::to_string(t.expectedXYBallAngleDegrees[1]));
-            testPassed = false;
-        }
-
-        if (!testPassed) {
-            numTestsFailed++;
-        }
-
-    }
-
-    GS_LOG_TRACE_MSG(trace, "Final Test Statistics:\nTotal Tests: " + std::to_string(numTotalTests) + ".\nTests Failed: " + std::to_string(numTestsFailed) + ".");
-
-    timer1.stop();
-    boost::timer::cpu_times times = timer1.elapsed();
-    std::cout << "analyzeShotImages timing: ";
-    std::cout << std::fixed << std::setprecision(8)
-        << times.wall / 1.0e9 << "s wall, "
-        << times.user / 1.0e9 << "s user + "
-        << times.system / 1.0e9 << "s system.\n";
-
-
-    return true;
-}
-
 
 bool testSpinDetection() {
 
@@ -733,7 +335,7 @@ bool testSpinDetection() {
     // const std::string kUnknown_DegreeBallFileName_00 = "loc_test_20_degree_right_strobed.png";
     // NEEDS TO BE CORRECTED FOR EACH TEST -  Assume only 1 camera for now, so all deltas are 0
     // In meters
-    std::vector<cv::Vec3d> camera_positions_from_origin = std::vector<cv::Vec3d>({ GolfSimCamera::kCamera1PositionsFromOriginMeters, GolfSimCamera::kCamera2PositionsFromOriginMeters });
+    std::vector<cv::Vec3d> camera_positions_from_origin = std::vector<cv::Vec3d>({ GolfSimCamera::kCamera1PositionsFromExpectedBallMeters, GolfSimCamera::kCamera2PositionsFromExpectedBallMeters });
 
 
     cv::Mat ball1ImgGray;
@@ -743,7 +345,7 @@ bool testSpinDetection() {
 
     CameraHardware::CameraModel  cameraModel = CameraHardware::PiGSCam6mmWideLens;
 
-    if (!read_test_images(k0_DegreeBallFileName_00, kUnknown_DegreeBallFileName_00, ball1ImgGray, ball2ImgGray, ball1ImgColor, ball2ImgColor, cameraModel, false /*No Undistort*/)) {
+    if (!GsAutomatedTesting::ReadTestImages(k0_DegreeBallFileName_00, kUnknown_DegreeBallFileName_00, ball1ImgGray, ball2ImgGray, ball1ImgColor, ball2ImgColor, cameraModel, false /*No Undistort*/)) {
         GS_LOG_TRACE_MSG(trace, "Failed to read valid images.");
         return false;
     }
@@ -752,12 +354,12 @@ bool testSpinDetection() {
     // using that calibrated data from the first ball.
     
     GolfSimCamera c;
-    c.camera_.init_camera_parameters(GsCameraNumber::kGsCamera1, cameraModel);
+    c.camera_hardware_.init_camera_parameters(GsCameraNumber::kGsCamera1, cameraModel);
 
     GolfBall ball1, ball2;
 
-    c.camera_.firstCannedImageFileName = kBaseTestDir + k0_DegreeBallFileName_00;
-    c.camera_.firstCannedImage = ball1ImgColor;
+    c.camera_hardware_.firstCannedImageFileName = kBaseTestDir + k0_DegreeBallFileName_00;
+    c.camera_hardware_.firstCannedImage = ball1ImgColor;
 
     cv::Vec2i expectedBallCenter = cv::Vec2i(1456 / 3, 1088 / 2);
 
@@ -776,10 +378,10 @@ bool testSpinDetection() {
         GS_LOG_TRACE_MSG(trace, "Failed to GetCalibratedBall.");
         return false;
     }
-    c.camera_.firstCannedImageFileName = kBaseTestDir + k0_DegreeBallFileName_00;
-    c.camera_.secondCannedImageFileName = kBaseTestDir + kUnknown_DegreeBallFileName_00;
-    c.camera_.firstCannedImage = ball1ImgColor;
-    c.camera_.secondCannedImage = ball2ImgColor;
+    c.camera_hardware_.firstCannedImageFileName = kBaseTestDir + k0_DegreeBallFileName_00;
+    c.camera_hardware_.secondCannedImageFileName = kBaseTestDir + kUnknown_DegreeBallFileName_00;
+    c.camera_hardware_.firstCannedImage = ball1ImgColor;
+    c.camera_hardware_.secondCannedImage = ball2ImgColor;
 
     success = c.GetCurrentBallLocation(c, ball2ImgColor, ball1, ball2);
 
@@ -875,7 +477,7 @@ bool testAnalyzeStrobedBalls() {
 
     CameraHardware::CameraModel  cameraModel = CameraHardware::PiGSCam6mmWideLens;
 
-    if (!read_test_images(kTestCamImageFileName_00, kTestCam2StrobedmageFileName, ball1ImgGray, ball2ImgGray, ball1ImgColor, ball2ImgColor, cameraModel,false /*No Undistort*/)) {
+    if (!GsAutomatedTesting::ReadTestImages(kTestCamImageFileName_00, kTestCam2StrobedmageFileName, ball1ImgGray, ball2ImgGray, ball1ImgColor, ball2ImgColor, cameraModel,false /*No Undistort*/)) {
         GS_LOG_TRACE_MSG(trace, "Failed to read valid images.");
         return false;
     }
@@ -934,7 +536,7 @@ bool test_strobed_balls_detection() {
     cv::Mat ball2ImgGray;
     cv::Mat ball1ImgColor;
     cv::Mat ball2ImgColor;
-    if (!read_test_images(kCam1BallOnTee, kCam2BallInFlight, ball1ImgGray, ball2ImgGray, ball1ImgColor, ball2ImgColor, CameraHardware::PiGSCam6mmWideLens)) {
+    if (!GsAutomatedTesting::ReadTestImages(kCam1BallOnTee, kCam2BallInFlight, ball1ImgGray, ball2ImgGray, ball1ImgColor, ball2ImgColor, CameraHardware::PiGSCam6mmWideLens)) {
         GS_LOG_MSG(error, "Failed to read valid images.");
         return false;
     }
@@ -945,17 +547,17 @@ bool test_strobed_balls_detection() {
 
     GolfSimCamera c;
     //get camera operational and make sure working correctly
-    c.camera_.cameraModel = CameraHardware::CameraModel::PiGSCam6mmWideLens;
+    c.camera_hardware_.cameraModel = CameraHardware::CameraModel::PiGSCam6mmWideLens;
 
     GolfBall ball1, ball2;
 
-    c.camera_.firstCannedImageFileName = kBaseTestDir + kCam1BallOnTee;
-    c.camera_.firstCannedImage = ball1ImgColor;
-    c.camera_.secondCannedImageFileName = kBaseTestDir + kCam2BallInFlight;
-    c.camera_.secondCannedImage = ball2ImgColor;
-    c.camera_.init_camera_parameters(GsCameraNumber::kGsCamera1, CameraHardware::CameraModel::PiGSCam6mmWideLens);
+    c.camera_hardware_.firstCannedImageFileName = kBaseTestDir + kCam1BallOnTee;
+    c.camera_hardware_.firstCannedImage = ball1ImgColor;
+    c.camera_hardware_.secondCannedImageFileName = kBaseTestDir + kCam2BallInFlight;
+    c.camera_hardware_.secondCannedImage = ball2ImgColor;
+    c.camera_hardware_.init_camera_parameters(GsCameraNumber::kGsCamera1, CameraHardware::CameraModel::PiGSCam6mmWideLens);
 
-    std::vector<cv::Vec3d> camera_positions_from_origin = std::vector<cv::Vec3d>({ GolfSimCamera::kCamera1PositionsFromOriginMeters, GolfSimCamera::kCamera2PositionsFromOriginMeters });
+    std::vector<cv::Vec3d> camera_positions_from_origin = std::vector<cv::Vec3d>({ GolfSimCamera::kCamera1PositionsFromExpectedBallMeters, GolfSimCamera::kCamera2PositionsFromExpectedBallMeters });
 
     cv::Vec2i expectedBallCenter = cv::Vec2i(1456 / 2, 1088 / 2);
 
@@ -1009,7 +611,7 @@ bool test_hit_trigger() {
 
     //get camera operational and make sure working correctly
     GolfSimCamera c;
-    c.camera_.cameraModel = CameraHardware::CameraModel::PiCam2;
+    c.camera_hardware_.cameraModel = CameraHardware::CameraModel::PiCam2;
 
     cv::Mat ball1ImgColor;
     cv::Mat ball2ImgColor;
@@ -1024,18 +626,18 @@ bool test_hit_trigger() {
 
     cv::Mat ball1Img;
     cv::Mat ball2Img;
-    ball1Img = undistort_image(ball1ImgColor, c.camera_.cameraModel);
-    ball2Img = undistort_image(ball2ImgColor, c.camera_.cameraModel);
+    ball1Img = GsAutomatedTesting::UndistortImage(ball1ImgColor, c.camera_hardware_.cameraModel);
+    ball2Img = GsAutomatedTesting::UndistortImage(ball2ImgColor, c.camera_hardware_.cameraModel);
 
-    c.camera_.resolution_x_ = ball1Img.cols;
-    c.camera_.resolution_y_ = ball1Img.rows;
-    c.camera_.resolution_x_override_ = ball1Img.cols;
-    c.camera_.resolution_y_override_ = ball1Img.rows;
-    c.camera_.firstCannedImageFileName = kBaseTestDir + kStationaryBallFileName_00;
-    c.camera_.secondCannedImageFileName = kBaseTestDir + kStationaryBallFileName_01;
-    c.camera_.firstCannedImage = ball1Img;
-    c.camera_.secondCannedImage = ball2Img;
-    c.camera_.init_camera_parameters(GsCameraNumber::kGsCamera1, c.camera_.cameraModel);
+    c.camera_hardware_.resolution_x_ = ball1Img.cols;
+    c.camera_hardware_.resolution_y_ = ball1Img.rows;
+    c.camera_hardware_.resolution_x_override_ = ball1Img.cols;
+    c.camera_hardware_.resolution_y_override_ = ball1Img.rows;
+    c.camera_hardware_.firstCannedImageFileName = kBaseTestDir + kStationaryBallFileName_00;
+    c.camera_hardware_.secondCannedImageFileName = kBaseTestDir + kStationaryBallFileName_01;
+    c.camera_hardware_.firstCannedImage = ball1Img;
+    c.camera_hardware_.secondCannedImage = ball2Img;
+    c.camera_hardware_.init_camera_parameters(GsCameraNumber::kGsCamera1, c.camera_hardware_.cameraModel);
 
 
     if (!c.prepareToTakePhoto()) {
@@ -1044,7 +646,7 @@ bool test_hit_trigger() {
     }
 
 
-    std::vector<cv::Vec3d> camera_positions_from_origin = std::vector<cv::Vec3d>({ GolfSimCamera::kCamera1PositionsFromOriginMeters, GolfSimCamera::kCamera2PositionsFromOriginMeters });
+    std::vector<cv::Vec3d> camera_positions_from_origin = std::vector<cv::Vec3d>({ GolfSimCamera::kCamera1PositionsFromExpectedBallMeters, GolfSimCamera::kCamera2PositionsFromExpectedBallMeters });
     cv::Vec2i expectedBallCenter = cv::Vec2i(1300, 1000);
 
     GS_LOG_TRACE_MSG(trace, "Looking for ball on tee");
@@ -1054,7 +656,7 @@ bool test_hit_trigger() {
 
     while (!success && !timedOut)
     {
-        img = c.camera_.take_photo();
+        img = c.camera_hardware_.take_photo();
 
         if (img.empty()) {
             GS_LOG_MSG(error, "Could not take picture!");
@@ -1290,7 +892,7 @@ void test_gspro_communication() {
 }
 
 // In Linux, this function will start running the actual LM code.
-// In Windoiws, this function will run whatever tests are currently
+// In Windows, this function will run whatever tests are currently
 // commented in to run.
 void run_main(int argc, char* argv[])
 {
@@ -1305,6 +907,7 @@ void run_main(int argc, char* argv[])
 
 
 #ifdef __unix__   
+    // What the program will do dpends on its mode
 
     if (GolfSimOptions::GetCommandLineOptions().shutdown_) {
 
@@ -1403,63 +1006,48 @@ void run_main(int argc, char* argv[])
     }
 
 
-    // In this mode, we just try to send the shutter and strobe pulses asap
-    // Only do so if this is the camera1 system, of course
-    // if in cam2_still_mode on the camera2 system, the only difference in
+    // In this mode, we just take a single picture and save it.
+    // Only do so locally if this is the camera1 system, of course
+    // If in cam2_still_mode on the camera2 system, send the shutter 
+    // and strobe pulses asap, though the difference in
     // operation will be the number of strobe pulses is cut to 1
+    // NOTE - when running in still mode for camera2, the Pi2/Camera2 process
+    // must separately be up and running to take the picture and return it
+    // to this process.
     if (GolfSimOptions::GetCommandLineOptions().camera_still_mode_) {
 
+        // We will still need IPC and cameras and such to communicate in and between the systems as usual
+        if (!PerformSystemStartupTasks()) {
+            GS_LOG_MSG(error, "Failed to PerformSystemStartupTasks.");
+            return;
+        }
+
+        GsCameraNumber camera_number = (GolfSimOptions::GetCommandLineOptions().system_mode_ == SystemMode::kCamera1) ? GsCameraNumber::kGsCamera1 : GsCameraNumber::kGsCamera2;
+
+        if (camera_number == GsCameraNumber::kGsCamera1) {
+            GS_LOG_TRACE_MSG(trace, "Running in cam_still_mode on camera1 system.  Will take one picture.");
+        }
+        else {
+            GS_LOG_TRACE_MSG(trace, "Running in  cam2 still mode on camera1 system.  Will take one strobed picture in camera2 system.");
+        }
+        cv::Mat image;
+
+        if (!GolfSimCamera::TakeStillPicture(camera_number, image)) {
+            GS_LOG_MSG(error, "FAILED to PulseStrobe::SendCameraPrimingPulses");
+        }
+
         std::string save_file_name = GolfSimOptions::GetCommandLineOptions().output_filename_;
+
         if (save_file_name.empty()) {
             GS_LOG_TRACE_MSG(trace, "No output output_filename specified.  Will save picture as: " + std::string(LoggingTools::kDefaultSaveFileName));
             save_file_name = LoggingTools::kDefaultSaveFileName;
         }
 
+        // Save the image
+        LoggingTools::LogImage("", image, std::vector < cv::Point >{}, true, save_file_name);
 
-        if (GolfSimOptions::GetCommandLineOptions().system_mode_ == SystemMode::kCamera1) {
-            GS_LOG_TRACE_MSG(trace, "Running in cam_still_mode on camera1 system.  Will take one  picture.");
-
-            // Just call the get-the-ball function to trigger an image capture.
-            // It will be saved as an artifact
-
-            GolfBall ball;
-            cv::Mat img;
-            // In addition to checking for the ball, this method will send an IPC results
-            // message if we are in calibration mode.
-
-            if (!CheckForBall(ball, img)) {
-                GS_LOG_TRACE_MSG(trace, "Failed to CheckForBall");
-            }
-
-            LoggingTools::LogImage("", img, std::vector < cv::Point >{}, true, save_file_name);
-
-        }
-
-        if (GolfSimOptions::GetCommandLineOptions().system_mode_ == SystemMode::kCamera2) {
-
-            // TBD - Not completed yet
-            GS_LOG_TRACE_MSG(trace, "Running in pulse cam2 still mode on camera1 system.  Will take one strobed picture in camera2 system.");
-
-            // Will need the GPIO system for the camera trigger and stobe
-            // The camera2 system will also have to be setup.
-            if (!PulseStrobe::InitGPIOSystem()) {
-                GS_LOG_MSG(error, "Failed to InitGPIOSystem.");
-                return;
-            }
-
-            if (!PulseStrobe::SendCameraPrimingPulses(true)) {
-                GS_LOG_MSG(error, "FAILED to PulseStrobe::SendCameraPrimingPulses");
-            }
-
-            // Give the camera2 system a moment
-            sleep(1);
-
-            PulseStrobe::SendExternalTrigger();
-
-            // At this point, the camera2 sytem should take a picture and return it
-
-        }
-
+        PerformSystemShutdownTasks();
+ 
         return;
     }
 
@@ -1534,6 +1122,22 @@ void run_main(int argc, char* argv[])
             break;
         }
 
+        case SystemMode::kCamera1AutoCalibrate:
+        case SystemMode::kCamera2AutoCalibrate:
+        {
+            GS_LOG_MSG(info, "Running in kCamera1AutoCalibrate or kCamera2AutoCalibrate mode.");
+
+            GsCameraNumber camera_number = (GolfSimOptions::GetCommandLineOptions().system_mode_ == SystemMode::kCamera1AutoCalibrate ? 
+                                        GsCameraNumber::kGsCamera1 : GsCameraNumber::kGsCamera2);
+
+            // We will want to send a calibration message to any monitor UIs
+            if (!GolfSimCamera::AutoCalibrateCamera(camera_number)) {
+                GS_LOG_MSG(info, "Failed to AutoCalibrateCamera.");
+                return;
+            }
+            break;
+        }
+
         case SystemMode::kCamera1Calibrate:
         case SystemMode::kCamera2Calibrate:
         {
@@ -1597,6 +1201,15 @@ void run_main(int argc, char* argv[])
         }
         break;
 
+        case SystemMode::kAutomatedTesting:
+        {
+            if (!GsAutomatedTesting::TestBallPosition()) {
+                GS_LOG_MSG(info, "Failed to TestBallPosition.");
+                return;
+            }
+        }
+        break;
+
         case SystemMode::kCamera1BallLocation:
         case SystemMode::kCamera2BallLocation:
         {
@@ -1612,11 +1225,11 @@ void run_main(int argc, char* argv[])
 
             GolfBall ball;
             cv::Mat img;
-            std::vector<cv::Vec3d> camera_positions_from_origin = std::vector<cv::Vec3d>({ GolfSimCamera::kCamera1PositionsFromOriginMeters, GolfSimCamera::kCamera2PositionsFromOriginMeters });
+            std::vector<cv::Vec3d> camera_positions_from_origin = std::vector<cv::Vec3d>({ GolfSimCamera::kCamera1PositionsFromExpectedBallMeters, GolfSimCamera::kCamera2PositionsFromExpectedBallMeters });
 
             CameraHardware::CameraModel  cameraModel = CameraHardware::PiGSCam6mmWideLens;
             GolfSimCamera c;
-            c.camera_.init_camera_parameters(GolfSimOptions::GetCommandLineOptions().GetCameraNumber(), cameraModel);
+            c.camera_hardware_.init_camera_parameters(GolfSimOptions::GetCommandLineOptions().GetCameraNumber(), cameraModel);
 
 
             int i = 0;
@@ -1686,12 +1299,47 @@ void run_main(int argc, char* argv[])
     }
 
 
-    // Comment in whichever tests you want to run in Windows here
-    testAnalyzeStrobedBalls();
-    // test_strobed_balls_detection();
-    // testBallPosition();
-    // test_gspro_communication();
-    // testSpinDetection();
+    switch (GolfSimOptions::GetCommandLineOptions().system_mode_) {
+
+        case SystemMode::kAutomatedTesting:
+        {
+            GS_LOG_MSG(info, "Running in (Windows) kAutomatedTesting mode.");
+
+            if (!GsAutomatedTesting::TestFinalShotResultData()) {
+                GS_LOG_MSG(error, "Failed TestBallPosition().");
+                return;
+            }
+            break;
+        }
+
+        case SystemMode::kCamera1AutoCalibrate:
+        case SystemMode::kCamera2AutoCalibrate:
+        {
+            GS_LOG_MSG(info, "Running in kCamera1AutoCalibrate or kCamera2AutoCalibrate mode.");
+
+            GsCameraNumber camera_number = (GolfSimOptions::GetCommandLineOptions().system_mode_ == SystemMode::kCamera1AutoCalibrate ?
+                GsCameraNumber::kGsCamera1 : GsCameraNumber::kGsCamera2);
+
+            // We will want to send a calibration message to any monitor UIs
+            if (!GolfSimCamera::AutoCalibrateCamera(camera_number)) {
+                GS_LOG_MSG(info, "Failed to AutoCalibrateCamera.");
+                return;
+            }
+            break;
+        }
+
+        default:
+        {
+            // Comment in whichever tests you want to run in Windows here
+            testAnalyzeStrobedBalls();
+            // test_strobed_balls_detection();
+            // TestBallPosition();
+            // test_gspro_communication();
+            // testSpinDetection();
+            break;
+        }
+    }
+
 #endif
 
     return;
