@@ -28,7 +28,9 @@ namespace golf_sim {
 		kCamera2BallLocation = 9,
 		kTestExternalSimMessage = 10,
 		kTestGSProServer = 11,
-		kAutomatedTesting = 12
+		kAutomatedTesting = 12,
+		kCamera1AutoCalibrate = 13,
+		kCamera2AutoCalibrate = 14,
 	};
 
 	enum LoggingLevel {

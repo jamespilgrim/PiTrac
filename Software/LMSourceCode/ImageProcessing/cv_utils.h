@@ -59,7 +59,7 @@ struct CvUtils
 
     static float ColorDistance(const GsColorTriplet& rgb1, const GsColorTriplet& rgb2);
 
-    // If the simpel difference of the two triplets shows that rgb1 is < rgb2,
+    // If the simple difference of the two triplets shows that rgb1 is < rgb2,
     // this method returns true
     static bool IsDarker(const GsColorTriplet& rgb1, const GsColorTriplet& rgb2);
 

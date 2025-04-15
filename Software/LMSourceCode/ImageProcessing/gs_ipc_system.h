@@ -37,6 +37,8 @@ namespace golf_sim {
 		static const std::string kGolfSimMessageType;
 		static const std::string kGolfSimIPCMessageTypeTag;
 
+		static cv::Mat last_received_image_;
+
 		static bool DispatchReceivedIpcMessage(const BytesMessage& message);
 		static bool SendIpcMessage(const GolfSimIPCMessage& ipc_message);
 

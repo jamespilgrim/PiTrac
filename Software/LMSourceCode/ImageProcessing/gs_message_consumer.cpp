@@ -115,7 +115,8 @@ namespace golf_sim {
             // We don't want our own messages fed back to us, so exclude them
             std::string system_id_to_exclude;
 
-            if (GolfSimOptions::GetCommandLineOptions().GetCameraNumber() == GsCameraNumber::kGsCamera1) {
+            if (GolfSimOptions::GetCommandLineOptions().GetCameraNumber() == GsCameraNumber::kGsCamera1 ||
+                GolfSimOptions::GetCommandLineOptions().camera_still_mode_) {
                 system_id_to_exclude = "LM_1";
             }
             else {

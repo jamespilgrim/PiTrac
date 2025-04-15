@@ -72,6 +72,9 @@ namespace golf_sim {
 		return true;
 	}
 
+
+	// TBD - Will need to be improved to adapt to having two cameras on the same
+	// Pi.
 	GolfSimConfiguration::PiModel GolfSimConfiguration::GetPiModel() {
 		GolfSimConfiguration::PiModel pi_model  = kRPi5;
 
@@ -111,8 +114,8 @@ bool GolfSimConfiguration::ReadValues() {
 
 	SetConstant("gs_config.physical_constants.kBallRadiusMeters", GolfBall::kBallRadiusMeters);
 
-	SetConstant("gs_config.cameras.kCamera1PositionsFromOriginMeters", GolfSimCamera::kCamera1PositionsFromOriginMeters);
-	SetConstant("gs_config.cameras.kCamera2PositionsFromOriginMeters", GolfSimCamera::kCamera2PositionsFromOriginMeters);
+	SetConstant("gs_config.cameras.kCamera1PositionsFromExpectedBallMeters", GolfSimCamera::kCamera1PositionsFromExpectedBallMeters);
+	SetConstant("gs_config.cameras.kCamera2PositionsFromExpectedBallMeters", GolfSimCamera::kCamera2PositionsFromExpectedBallMeters);
 	SetConstant("gs_config.cameras.kCamera2OffsetFromCamera1OriginMeters", GolfSimCamera::kCamera2OffsetFromCamera1OriginMeters);
 
 #ifdef __unix__  // Ignore in Windows environment

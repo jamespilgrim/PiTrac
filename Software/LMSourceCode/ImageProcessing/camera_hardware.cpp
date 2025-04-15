@@ -326,7 +326,7 @@ namespace golf_sim {
                 calibrationMatrix = (cv::Mat_<float>(3, 3) <<
                     1, 0, 0,
                     0, 1, 0,
-                    0, 00, 1);
+                    0, 0, 1);
 
                 cameraDistortionVector = (cv::Mat_<float>(1, 5) <<
                     1, 1, 1, 1, 1);
@@ -368,6 +368,7 @@ namespace golf_sim {
 
 
     // Must be called before taking a picture
+    // TBD - Deprecated
     bool CameraHardware::prepareToTakeVideo() {
         GS_LOG_TRACE_MSG(trace, "prepareToTakeVideo called with resolution(X,Y) = (" + std::to_string(resolution_x_) + "," + std::to_string(resolution_y_) + ")");
 

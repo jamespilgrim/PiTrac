@@ -422,11 +422,11 @@ bool GsAutomatedTesting::TestFinalShotResultData() {
 cv::Mat GsAutomatedTesting::UndistortImage(const cv::Mat& img, CameraHardware::CameraModel camera_model) {
     // Get a camera object just to be able to get the calibration values
     GolfSimCamera c;
-    c.camera_.resolution_x_override_ = img.cols;
-    c.camera_.resolution_y_override_ = img.rows;
-    c.camera_.init_camera_parameters(GsCameraNumber::kGsCamera1, camera_model);
-    cv::Mat cameracalibrationMatrix = c.camera_.calibrationMatrix;
-    cv::Mat cameraDistortionVector = c.camera_.cameraDistortionVector;
+    c.camera_hardware_.resolution_x_override_ = img.cols;
+    c.camera_hardware_.resolution_y_override_ = img.rows;
+    c.camera_hardware_.init_camera_parameters(GsCameraNumber::kGsCamera1, camera_model);
+    cv::Mat cameracalibrationMatrix = c.camera_hardware_.calibrationMatrix;
+    cv::Mat cameraDistortionVector = c.camera_hardware_.cameraDistortionVector;
 
     cv::Mat unDistortedBall1Img;
     cv::Mat m_undistMap1, m_undistMap2;
@@ -571,17 +571,17 @@ bool GsAutomatedTesting::TestBallPosition() {
 
 
         GolfSimCamera c;
-        c.camera_.resolution_x_ = ball1ImgColor.cols;
-        c.camera_.resolution_y_ = ball1ImgColor.rows;
-        c.camera_.resolution_x_override_ = ball1ImgColor.cols;
-        c.camera_.resolution_y_override_ = ball1ImgColor.rows;
+        c.camera_hardware_.resolution_x_ = ball1ImgColor.cols;
+        c.camera_hardware_.resolution_y_ = ball1ImgColor.rows;
+        c.camera_hardware_.resolution_x_override_ = ball1ImgColor.cols;
+        c.camera_hardware_.resolution_y_override_ = ball1ImgColor.rows;
 
         // Just for development on a non-Raspberry-Pi machine
-        c.camera_.firstCannedImageFileName = kAutomatedBaseTestDir + teed_ball_image_filename;
-        c.camera_.secondCannedImageFileName = kAutomatedBaseTestDir + strobed_balls_image_filename;
-        c.camera_.firstCannedImage = ball1ImgColor;
-        c.camera_.secondCannedImage = ball2ImgColor;
-        c.camera_.init_camera_parameters(GsCameraNumber::kGsCamera1, t.camera_model);
+        c.camera_hardware_.firstCannedImageFileName = kAutomatedBaseTestDir + teed_ball_image_filename;
+        c.camera_hardware_.secondCannedImageFileName = kAutomatedBaseTestDir + strobed_balls_image_filename;
+        c.camera_hardware_.firstCannedImage = ball1ImgColor;
+        c.camera_hardware_.secondCannedImage = ball2ImgColor;
+        c.camera_hardware_.init_camera_parameters(GsCameraNumber::kGsCamera1, t.camera_model);
 
         long timeDelayuS = 7000;
         GolfBall result_ball;

@@ -142,7 +142,7 @@ namespace golf_sim {
         if (receive_thread_exited_) {
             GS_LOG_MSG(error, "GsGSProInterface::SendResults called before the interface was intialized.");
 
-            // If we ended the recieve thread, try re-initializing the connection
+            // If we ended the receive thread, try re-initializing the connection
             DeInitialize();
             if (!Initialize()) {
                 GS_LOG_MSG(error, "GsGSProInterface::SendResults called before the interface was intialized.");

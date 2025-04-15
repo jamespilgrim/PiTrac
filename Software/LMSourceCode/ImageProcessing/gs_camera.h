@@ -97,8 +97,8 @@ namespace golf_sim {
         static int kMaximumOffTrajectoryDistance;
         static uint kNumberHighQualityBallsToRetain;
 
-        static cv::Vec3d kCamera1PositionsFromOriginMeters;
-        static cv::Vec3d kCamera2PositionsFromOriginMeters;
+        static cv::Vec3d kCamera1PositionsFromExpectedBallMeters;
+        static cv::Vec3d kCamera2PositionsFromExpectedBallMeters;
         static cv::Vec3d kCamera2OffsetFromCamera1OriginMeters;
 
 
@@ -181,10 +181,10 @@ namespace golf_sim {
 
         static bool kPlacedBallUseLargestBall;
 
+        static cv::Vec3d kAutoCalibrationBallPositionFromCameraMeters;
 
         // Refers to the camera_hardware device object associated with this higher-level camera object
-        // TBD - name should really be hardwareCamera_
-        CameraHardware camera_;
+        CameraHardware camera_hardware_;
         
         GolfSimCamera();
 
@@ -455,7 +455,6 @@ namespace golf_sim {
         static bool ProcessSpin(GolfSimCamera& camera, 
                                 const cv::Mat& strobed_balls_gray_image,
                                 const GsBallsAndTimingVector& non_overlapping_balls_and_timing,
-                                std::vector<cv::Vec3d>& camera2_to_camera2_positions_from_origin,
                                 GolfBall& result_ball,
                                 cv::Vec3d& rotationResults);
 
@@ -466,6 +465,19 @@ namespace golf_sim {
 
         // Returns the lines used to try to remove the golf club shaft artifacts
         static bool CleanExternalStrobeArtifacts(const cv::Mat& image, cv::Mat& output_image, std::vector<cv::Vec4i>& lines);
+
+        static bool AutoCalibrateCamera(GsCameraNumber camera_number);
+
+        static bool RetrieveAutoCalibrationConstants(GsCameraNumber camera_number);
+
+        static bool DetermineCameraAngles(const cv::Mat& color_image, const GolfSimCamera& camera);
+
+        // Take a single still picture with the specified camera.  May require the Pi 2 (Camera 2) 
+        // process to be running if that is the specified camera.
+        static bool TakeStillPicture(const GsCameraNumber camera_number, cv::Mat& color_image);
+
+        // Returns -1.0 on error, otherwise a positive focal length (e.g., 6.3)
+        static double DetermineFocalLengthForAutoCalibration(const cv::Mat& color_image, const GolfSimCamera& camera);
 
         // Determine how much we widen the color mask from the average color of the ball
         // TBD - determine whether H, S, and V need different multipliers ?

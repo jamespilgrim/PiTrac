@@ -416,7 +416,7 @@ namespace golf_sim {
         // TBD - Consider case where we did NOT get a ball hit indication for some reason
         GS_LOG_MSG(info, "============= BALL HIT ===============\n");
 
-        // Make sure we do something sensible if we don't recieve an image from the camera 2
+        // Make sure we do something sensible if we don't receive an image from the camera 2
         // system in a reasonable amount of time.
         // TBD - How to turn the check off when we DO get an image?
         setupCam2ImageReceivedCheckTimer();
@@ -928,8 +928,11 @@ namespace golf_sim {
         
         GsUISystem::SendIPCStatusMessage(GsIPCResultType::kInitializing);
 
+        // Even if we are in kCamera2 mode, but also in still mode, we will wan to initialize
+        // the GPIO system
         if (GolfSimOptions::GetCommandLineOptions().system_mode_ == SystemMode::kCamera1 ||
-            GolfSimOptions::GetCommandLineOptions().system_mode_ == SystemMode::kCamera1TestStandalone) {
+            GolfSimOptions::GetCommandLineOptions().system_mode_ == SystemMode::kCamera1TestStandalone ||
+            GolfSimOptions::GetCommandLineOptions().camera_still_mode_ ) {
 
             if (!PulseStrobe::InitGPIOSystem(default_signal_handler)) {
                 GS_LOG_MSG(error, "Failed to InitGPIOSystem.");

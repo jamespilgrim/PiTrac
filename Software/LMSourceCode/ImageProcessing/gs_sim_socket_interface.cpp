@@ -234,7 +234,7 @@ namespace golf_sim {
 
         if (receive_thread_exited_) {
             GS_LOG_MSG(error, "GsSimSocketInterface::SendResults called before the interface was intialized - trying to re-initialize.");
-            // If we ended the recieve thread, try re-initializing the connection
+            // If we ended the receive thread, try re-initializing the connection
             DeInitialize();
             if (!Initialize()) {
                 GS_LOG_MSG(error, "GsSimSocketInterface::SendResults could not re-intialize thew interface.");

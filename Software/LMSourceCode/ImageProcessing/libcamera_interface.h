@@ -81,10 +81,13 @@ namespace golf_sim {
 		static int previously_found_device_number_;
 	};
 
+	bool TakeRawPicture(cv::Mat& img);
+
+	// Takes a picture and then tries to find the ball
 	bool CheckForBall(GolfBall& ball, cv::Mat& return_image);
 
 	// Configures the camera and the rest of the system to sit in a tight loop, waiting for the
-	// ball to move.  Blocks until movement or some other even that causes the loop to stop
+	// ball to move.  Blocks until movement or some other event that causes the loop to stop
 	// Returns whether or not motion was detected
 	// Lower-level methods in the loop will try to trigger the external shutter of the camera 2
 	// as soon as possible after motion has been detected.

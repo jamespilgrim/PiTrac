@@ -38,6 +38,8 @@ namespace golf_sim {
     std::string GolfSimIpcSystem::kActiveMQLMIdProperty = "LM_System_ID";
 
 
+    cv::Mat GolfSimIpcSystem::last_received_image_;
+
     bool GolfSimIpcSystem::InitializeIPCSystem() {
 
         // We prefer the command-line setting even if there's one in the .json config file
@@ -345,6 +347,16 @@ namespace golf_sim {
 
         GS_LOG_TRACE_MSG(trace, "DispatchCamera2ImageMessage received Ipc Message.");
 
+        // If in still-image mode, we won't inform the state machine about the message.
+        // Instead just save the image so that someone can get to it.
+        if (GolfSimOptions::GetCommandLineOptions().camera_still_mode_) {
+            GS_LOG_TRACE_MSG(trace, "In still-picture camera mode.  Will save received image.");
+
+            last_received_image_ = message.GetImageMat().clone();
+
+            return true;
+        }
+
         // Let the FSM deal with the message by entering a related message into the queue
 
         switch (GolfSimOptions::GetCommandLineOptions().system_mode_) {
@@ -367,6 +379,7 @@ namespace golf_sim {
 
                 break;
             }
+
             case SystemMode::kTest:
             default:
             {

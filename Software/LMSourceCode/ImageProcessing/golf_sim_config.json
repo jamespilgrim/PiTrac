@@ -34,9 +34,9 @@
 
 			"kStrobedBallsAltCannyLower": 35,
 			"kStrobedBallsAltCannyUpper": 80,
-			"kStrobedBallsAltPreCannyBlurSize": 11,
+			"kStrobedBallsAltPreCannyBlurSize": 7,
 			"kStrobedBallsAltPreHoughBlurSize HAS TO BE ODD": 0,
-			"kStrobedBallsAltPreHoughBlurSize": 17,
+			"kStrobedBallsAltPreHoughBlurSize": 7,
 			"kStrobedBallsAltMinParam2": 0.5,
 			"kStrobedBallsAltMaxParam2": 1.0,
 			"kStrobedBallsAltStartingParam2": 0.65,
@@ -45,8 +45,8 @@
 			"kStrobedBallsAltHoughDpParam1": 0.8,
 
 			"kUseCLAHEProcessing": 1,
-			"kCLAHEClipLimit": 6,
-			"kCLAHETilesGridSize": 8,
+			"kCLAHEClipLimit": 4,
+			"kCLAHETilesGridSize": 3,
 
 			"kPuttingBallMinParam2": 0.8,
 			"kPuttingBallMaxParam2": 1.0,
@@ -227,8 +227,8 @@
 			"kCamera2PuttingContrast": 1.2,
 			"kCamera1StillShutterTimeuS": 40000,
 			"kCamera2StillShutterTimeuS": 15000,
-			"kCamera1PositionsFromOriginMeters": [ 0.60, 0.275, 0.56 ],
-			"kCamera2PositionsFromOriginMeters": [ 0.0, -0.051, 0.55 ],
+			"kCamera1PositionsFromExpectedBallMeters": [ 0.60, 0.275, 0.56 ],
+			"kCamera2PositionsFromExpectedBallMeters": [ 0.0, -0.051, 0.55 ],
 			"kCamera2OffsetFromCamera1OriginMeters": [ 0.03, -0.19, 0.0 ],
 			"kCamera1Angles": [ 46.97, -18.33 ],
 			"kCamera2Angles": [ 0, 6.77 ],
@@ -261,7 +261,9 @@
 
 		"calibration": {
 			"kCamera1CalibrationDistanceToBall": 0.87,
-			"kCamera2CalibrationDistanceToBall": 0.55
+			"kCamera2CalibrationDistanceToBall": 0.55,
+			"kTestAutoCalibrationFileName": "M:\\Dev\\PiTrac\\Software\\LMSourceCode\\Images\\autocalibrate_cam2_still_picture.png"
+
 		},
 
 		"golf_simulator_interfaces": {
@@ -285,9 +287,9 @@
 			"kEnableClubImages": 0,
 			"kClubImageOutputDir": "/home/PiTracUserName/LM_Shares/Images/",
 			"kNumberFramesToSaveBeforeHit": 6,
-			"kNumberFramesToSaveAfterHit": 6,
-			"kClubImageWidthPixels": 96,
-			"kClubImageHeightPixels": 88,
+			"kNumberFramesToSaveAfterHit": 8,
+			"kClubImageWidthPixels": 340,
+			"kClubImageHeightPixels": 200,
 			"kClubImageCameraGain": 40,
 			"kClubImageShutterSpeedMultiplier": 0.4
 		},

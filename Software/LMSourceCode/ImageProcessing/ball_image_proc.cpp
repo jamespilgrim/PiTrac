@@ -2656,6 +2656,12 @@ namespace golf_sim {
                                              const GolfBall& ball1, 
                                              const cv::Mat& full_gray_image2, 
                                              const GolfBall& ball2) {
+        // NOTE - This function (and downstream functions) assumes that ball1 is the earlier-in-time ball
+        // for a right-handed shot.  So, for example, the expected spin will be largely counter-clockwise
+        // from ball 1 to ball 2.
+        // Make sure that for left-handed shots this is correct - we will assume that for
+        // left-handed shots, ball1 is still to the LEFT of ball 2
+        
         BOOST_LOG_FUNCTION();
 
         GS_LOG_TRACE_MSG(trace, "GetBallRotation called with ball1 = " + ball1.Format() + ",\nball2 = " + ball2.Format());
