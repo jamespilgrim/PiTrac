@@ -1,0 +1,7 @@
+Shot ID,,Comparison (PiTrac value minus Uneekor),,,,,,System Data,,,,,,,,,,,,,,,,,,,
+Ball, PiTrac Shot, Speed ? (mph), VLA ? , HLA ? °, Back Spin ? (rpm), Side Spin ? (rpm), , Uneekor Speed, PiTrac Speed, , Uneekor VLA°, PiTrac VLA°, , Uneekor HLA°, PiTrac HLA°, , Uneekor Back Spin, PiTrac Back Spin, , Uneekor Side Spin, PiTrac Side Spin, , Ball ID Picture, Spin Ball 1, Spin Ball 2, Test Result Ball, Notes
+,1,-2.58109,0.218401,-0.980485,-336,-1073, ,66.6,64.0189, ,19.1,18.1195, ,-5.6,-5.3816, ,3987,3650.79, ,-355,-1428.57,FAIL
+ , , , ,
+,2,
+,3,-3.91849,-2.07088,-0.631305,-602,-60, ,60.5,56.5815, ,14.5,13.8687, ,-5.5,-7.57088, ,2137,1534.39, ,-1421,-1481.48,FAIL
+ , , , ,
