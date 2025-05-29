@@ -54,6 +54,9 @@
     <!-- test -->
     <junit-jupiter-api.version>5.11.4</junit-jupiter-api.version>
     <mockito-junit-jupiter.version>5.15.2</mockito-junit-jupiter.version>
+
+    <!-- jackson for log4j yaml -->
+    <jackson.version>2.15.3</jackson.version>
   </properties>
 
   <dependencies>
@@ -129,7 +132,22 @@ ly -->
       <version>${log4j.version}</version>
     </dependency>
 
-
+    <!-- Jackson dependencies for Log4j YAML -->
+    <dependency>
+      <groupId>com.fasterxml.jackson.core</groupId>
+      <artifactId>jackson-core</artifactId>
+      <version>${jackson.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>com.fasterxml.jackson.core</groupId>
+      <artifactId>jackson-databind</artifactId>
+      <version>${jackson.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>com.fasterxml.jackson.dataformat</groupId>
+      <artifactId>jackson-dataformat-yaml</artifactId>
+      <version>${jackson.version}</version>
+    </dependency>
   </dependencies>
 
   <build>

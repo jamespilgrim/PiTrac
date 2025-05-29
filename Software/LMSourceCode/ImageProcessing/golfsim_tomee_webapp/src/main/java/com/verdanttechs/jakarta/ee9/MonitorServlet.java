@@ -31,6 +31,7 @@ import jakarta.jms.JMSException;
 import jakarta.jms.ExceptionListener;
 
 import java.io.FileReader;
+
 import com.google.gson.Gson;
 import com.google.gson.JsonParser;
 import com.google.gson.JsonObject;
@@ -44,8 +45,9 @@ import java.io.IOException;
 @WebServlet("/monitor")
 public class MonitorServlet extends HttpServlet {
 
-    private static Logger logger =  LogManager.getLogger(MonitorServlet.class);
-    public enum GsIPCResultType { 
+    private static Logger logger = LogManager.getLogger(MonitorServlet.class);
+
+    public enum GsIPCResultType {
         kUnknown,
         kInitializing,
         kWaitingForBallToAppear,
@@ -69,11 +71,11 @@ public class MonitorServlet extends HttpServlet {
         kControlMessage;
     }
 
-    public enum GsClubType { 
-   		kNotSelected,
-		kDriver,
-		kIron,
-		kPutter;
+    public enum GsClubType {
+        kNotSelected,
+        kDriver,
+        kIron,
+        kPutter;
     }
 
     final static int kClubChangeToPutterControlMsgType = 1;
@@ -95,64 +97,64 @@ public class MonitorServlet extends HttpServlet {
         logger.info("SetClubType called with club type = " + String.valueOf(club));
         System.out.println("SetClubType called with club type = " + String.valueOf(club));
 
-            try {
-                if (!producer_created) {
-                    producer_connection_factory = new ActiveMQConnectionFactory(kWebActiveMQHostAddress);
+        try {
+            if (!producer_created) {
+                producer_connection_factory = new ActiveMQConnectionFactory(kWebActiveMQHostAddress);
 
-                    producer_connection = producer_connection_factory.createConnection();
-                    producer_connection.start();
-    
-                    producer_session = producer_connection.createSession(false, Session.AUTO_ACKNOWLEDGE);
-    
-                    producer_destination = producer_session.createTopic(kGolfSimTopic);
+                producer_connection = producer_connection_factory.createConnection();
+                producer_connection.start();
 
-                    producer = producer_session.createProducer(producer_destination);
-                    producer.setDeliveryMode(DeliveryMode.NON_PERSISTENT);
+                producer_session = producer_connection.createSession(false, Session.AUTO_ACKNOWLEDGE);
 
-                    producer_created = true;
-                }
+                producer_destination = producer_session.createTopic(kGolfSimTopic);
 
-                BytesMessage bytesMessage = producer_session.createBytesMessage();
+                producer = producer_session.createProducer(producer_destination);
+                producer.setDeliveryMode(DeliveryMode.NON_PERSISTENT);
 
-
-                bytesMessage.setStringProperty("Message Type", "GolfSimIPCMessage");
-                bytesMessage.setIntProperty("IPCMessageType",7 /*kControlMessage*/);
-                bytesMessage.setStringProperty("LM_System_ID", "LM_GUI");
-
-                MessageBufferPacker packer = MessagePack.newDefaultBufferPacker();
-
-                int control_msg_type = 0;
-                
-                if (club == GsClubType.kPutter) {
-                    control_msg_type = kClubChangeToPutterControlMsgType;
-                } else if (club == GsClubType.kIron) {
-                    // TBD - Not yet supported
-                } else if (club == GsClubType.kDriver) {
-                    control_msg_type = kClubChangeToDriverControlMsgType;
-                }
-                
-                packer
-                    .packInt(control_msg_type);
-
-                packer.close();
-
-                final byte[] bytes = packer.toByteArray();
-                
-                bytesMessage.writeBytes(bytes);
-
-                System.out.println("Created BytesMessage of size = " + String.valueOf(bytes.length));
-
-                producer.send(bytesMessage);
-
-                // Also set the current result object to have the same club type
-                current_result_.club_type_ = club;
-
-            } catch (Exception e) {
-                System.out.println("Caught: " + e);
-                e.printStackTrace();
+                producer_created = true;
             }
 
+            BytesMessage bytesMessage = producer_session.createBytesMessage();
+
+
+            bytesMessage.setStringProperty("Message Type", "GolfSimIPCMessage");
+            bytesMessage.setIntProperty("IPCMessageType", 7 /*kControlMessage*/);
+            bytesMessage.setStringProperty("LM_System_ID", "LM_GUI");
+
+            MessageBufferPacker packer = MessagePack.newDefaultBufferPacker();
+
+            int control_msg_type = 0;
+
+            if (club == GsClubType.kPutter) {
+                control_msg_type = kClubChangeToPutterControlMsgType;
+            } else if (club == GsClubType.kIron) {
+                // TBD - Not yet supported
+            } else if (club == GsClubType.kDriver) {
+                control_msg_type = kClubChangeToDriverControlMsgType;
+            }
+
+            packer
+                    .packInt(control_msg_type);
+
+            packer.close();
+
+            final byte[] bytes = packer.toByteArray();
+
+            bytesMessage.writeBytes(bytes);
+
+            System.out.println("Created BytesMessage of size = " + String.valueOf(bytes.length));
+
+            producer.send(bytesMessage);
+
+            // Also set the current result object to have the same club type
+            current_result_.club_type_ = club;
+
+        } catch (Exception e) {
+            System.out.println("Caught: " + e);
+            e.printStackTrace();
         }
+
+    }
 
 
     public static class GsIPCResult {
@@ -168,17 +170,17 @@ public class MonitorServlet extends HttpServlet {
         public GsClubType club_type_ = GsClubType.kNotSelected;
         public GsIPCResultType result_type_ = GsIPCResultType.kUnknown;
         public String message_ = "No message set";
-        public Vector<String> log_messages_ = new Vector<String>(20,2);
+        public Vector<String> log_messages_ = new Vector<String>(20, 2);
 
 
         public static int MetersToYards(int meters) {
-            return (int)((3.281/3.0) * meters);
+            return (int) ((3.281 / 3.0) * meters);
         }
 
         public static float MetersPerSecondToMPH(float speed_mpers) {
-            return (float)(speed_mpers * 2.23694);
+            return (float) (speed_mpers * 2.23694);
         }
-        
+
         public static String FormatClubType(GsClubType club_type) {
 
             String s;
@@ -186,23 +188,23 @@ public class MonitorServlet extends HttpServlet {
             switch (club_type) {
                 case kDriver: {
                     s = "Driver";
-                break;
+                    break;
                 }
 
                 case kIron: {
                     s = "Iron";
-                break;
+                    break;
                 }
 
                 case kPutter: {
                     s = "Putter";
-                break;
+                    break;
                 }
 
                 default:
                 case kNotSelected: {
                     s = "Not selected";
-                break;
+                    break;
                 }
             }
             return s;
@@ -217,8 +219,8 @@ public class MonitorServlet extends HttpServlet {
 
             String carry_yards_str;
             String speed_mph_str;
-            String launch_angle_deg_str; 
-            String side_angle_deg_str; 
+            String launch_angle_deg_str;
+            String side_angle_deg_str;
             String back_spin_rpm_str;
             String side_spin_rpm_str;
             String confidence_str;
@@ -234,20 +236,19 @@ public class MonitorServlet extends HttpServlet {
             if (club_type_ != GsClubType.kNotSelected) {
                 club_str = FormatClubType(club_type_);
             }
-            
+
             if (Math.abs(speed_mph) > 0.001) {
                 carry_yards_str = "--";  // TBD  - Not implemented yet.   String.valueOf(carry_yards) + " yards";
 
                 if (club_type_ != GsClubType.kPutter) {
-                    int speed_mph_int = (int)speed_mph;
-                    speed_mph_str =  String.format("%.1f", speed_mph) + " mph";
-                    launch_angle_deg_str = String.format("%.1f", launch_angle_deg_) + "&deg"; 
-                }
-                else {
-                    speed_mph_str =  String.format("%.2f", speed_mph) + " mph";
+                    int speed_mph_int = (int) speed_mph;
+                    speed_mph_str = String.format("%.1f", speed_mph) + " mph";
+                    launch_angle_deg_str = String.format("%.1f", launch_angle_deg_) + "&deg";
+                } else {
+                    speed_mph_str = String.format("%.2f", speed_mph) + " mph";
                     launch_angle_deg_str = "--";
                 }
-                side_angle_deg_str = String.format("%.1f", side_angle_deg_) + "&deg"; 
+                side_angle_deg_str = String.format("%.1f", side_angle_deg_) + "&deg";
 
                 // Spin doesn't really make sense for a putter
                 if (club_type_ != GsClubType.kPutter && Math.abs(back_spin_rpm_) > 0.001) {
@@ -263,24 +264,21 @@ public class MonitorServlet extends HttpServlet {
                             side_spin_direction = "R ";
                         }
                         side_spin_rpm_str = side_spin_direction + String.valueOf(side_spin_rpm_) + " rpm";
-                    }
-                    else {
+                    } else {
                         back_spin_rpm_str = "err-out of range";
                         side_spin_rpm_str = "err-out of range";
                     }
-                }
-                else {
+                } else {
                     // System.out.println("Received back_spin_rpm_ = 0.");
                     back_spin_rpm_str = "--";
                     side_spin_rpm_str = "--";
                 }
                 confidence_str = String.valueOf(confidence_) + " rpm";
-            }
-            else {
+            } else {
                 carry_yards_str = "--";
                 speed_mph_str = "--";
                 launch_angle_deg_str = "--";
-                side_angle_deg_str = "--"; 
+                side_angle_deg_str = "--";
                 back_spin_rpm_str = "--";
                 side_spin_rpm_str = "--";
                 result_type_str = "--";
@@ -292,30 +290,27 @@ public class MonitorServlet extends HttpServlet {
 
             if (result_type != "") {
                 result_type_str = String.valueOf(result_type);
-            }
-            else {
+            } else {
                 result_type_str = "--";
             }
 
             if (message_ != "") {
                 message_str = String.valueOf(message_);
-            }
-            else {
+            } else {
                 message_str = "--";
             }
 
             if (log_messages_.size() > 0) {
                 log_messages_str = "<log-text>";
-                log_messages_str += "<br><br>       <b>Log Messages:</b> <br>" ;
+                log_messages_str += "<br><br>       <b>Log Messages:</b> <br>";
 
                 for (int i = 0; i < log_messages_.size(); i++) {
-                    log_messages_str += log_messages_.elementAt(i) + "<br>" ;
-                    log_messages_console_str += log_messages_.elementAt(i) + "\n" ;
+                    log_messages_str += log_messages_.elementAt(i) + "<br>";
+                    log_messages_console_str += log_messages_.elementAt(i) + "\n";
                 }
 
                 log_messages_str += "<\\log-text>";
-            }
-            else {
+            } else {
                 log_messages_str = "--";
             }
 
@@ -333,15 +328,15 @@ public class MonitorServlet extends HttpServlet {
             request.setAttribute("log_messages", log_messages_str);
 
             String s = "Carry: " + carry_yards_str + " yards." +
-                "              Speed: " + speed_mph_str + " mph.<br>" +
-                "       Launch Angle: " + launch_angle_deg_str + " degrees." +
-                "         Side Angle: " + side_angle_deg_str + " degrees.<br>" +
-                "          Back Spin: " + back_spin_rpm_str + " rpm." +
-                "          Side Spin: " + side_spin_rpm_str + " rpm.<br>" +
-                "         Confidence: " + confidence_str + " (0-10).<br>" +
-                "          Club Type: " + club_type_ + " 0-Unselected, 1-Driver, 2-Iron, 3-Putter\n" +
-                "        Result Type: " + result_type_str + "<br>" +
-                "            Message: " + message_str ;
+                    "              Speed: " + speed_mph_str + " mph.<br>" +
+                    "       Launch Angle: " + launch_angle_deg_str + " degrees." +
+                    "         Side Angle: " + side_angle_deg_str + " degrees.<br>" +
+                    "          Back Spin: " + back_spin_rpm_str + " rpm." +
+                    "          Side Spin: " + side_spin_rpm_str + " rpm.<br>" +
+                    "         Confidence: " + confidence_str + " (0-10).<br>" +
+                    "          Club Type: " + club_type_ + " 0-Unselected, 1-Driver, 2-Iron, 3-Putter\n" +
+                    "        Result Type: " + result_type_str + "<br>" +
+                    "            Message: " + message_str;
 
             if (log_messages_.size() > 0) {
                 s += "       Log Messages:\n" + log_messages_console_str;
@@ -352,14 +347,12 @@ public class MonitorServlet extends HttpServlet {
 
             // System.out.println("Checking for Ball placed");
 
-            if (result_type_ == GsIPCResultType.kBallPlacedAndReadyForHit)
-            {
+            if (result_type_ == GsIPCResultType.kBallPlacedAndReadyForHit) {
                 System.out.println("Ball placed - setting ball_ready_color to 'item1 grid-item-text-center-green'");
                 request.setAttribute("ball_ready_color", "\"item1 grid-item-text-center-green\"");
             }
 
-            if (result_type_ == GsIPCResultType.kWaitingForSimulatorArmed)
-            {
+            if (result_type_ == GsIPCResultType.kWaitingForSimulatorArmed) {
                 System.out.println("kWaitingForSimulatorArmed - setting ball_ready_color to 'item1 grid-item-text-center-yellow'");
                 request.setAttribute("ball_ready_color", "\"item1 grid-item-text-center-yellow\"");
             }
@@ -367,29 +360,24 @@ public class MonitorServlet extends HttpServlet {
             // If the result is a hit, then include IMG images
             // Even if it's an error, we might still find the images (if they
             // exist) to be useful
-            if (result_type_ == GsIPCResultType.kHit)
-            {
+            if (result_type_ == GsIPCResultType.kHit) {
                 String images_string = "";
-                
+
                 if (club_type_ == GsClubType.kDriver) {
-                    images_string += "<img src=\"" + kWebServerTomcatShareDirectory + "/" + kWebServerResultSpinBall1Image + "\" alt=\"1st Ball Image\" />" + 
-                                     "<img src=\"" + kWebServerTomcatShareDirectory + "/" + kWebServerResultSpinBall2Image + "\" alt=\"2nd Ball Image\" />" + 
-                                     "<img src=\"" + kWebServerTomcatShareDirectory + "/" + kWebServerResultBallRotatedByBestAngles + "\" alt=\"Ball1 Rotated by determined angles image\" />";
+                    images_string += "<img src=\"" + kWebServerTomcatShareDirectory + "/" + kWebServerResultSpinBall1Image + "\" alt=\"1st Ball Image\" />" +
+                            "<img src=\"" + kWebServerTomcatShareDirectory + "/" + kWebServerResultSpinBall2Image + "\" alt=\"2nd Ball Image\" />" +
+                            "<img src=\"" + kWebServerTomcatShareDirectory + "/" + kWebServerResultBallRotatedByBestAngles + "\" alt=\"Ball1 Rotated by determined angles image\" />";
                 }
 
-                images_string += "<img src=\"" + kWebServerTomcatShareDirectory + "/" + kWebServerResultBallExposureCandidates + "\" alt=\"Identified Exposures Image\" width = \"720\" heigth=\"544\" />"; 
+                images_string += "<img src=\"" + kWebServerTomcatShareDirectory + "/" + kWebServerResultBallExposureCandidates + "\" alt=\"Identified Exposures Image\" width = \"720\" heigth=\"544\" />";
 
-                request.setAttribute("images", images_string);                                                
-            }
-            else if (result_type_ == GsIPCResultType.kError )
-            {
+                request.setAttribute("images", images_string);
+            } else if (result_type_ == GsIPCResultType.kError) {
                 request.setAttribute("images", "<img src=\"" + kWebServerTomcatShareDirectory + "/" + kWebServerResultBallExposureCandidates + "\" alt=\"Identified Exposures Image\" width = \"720\" heigth=\"544\" />" +
-                            "<img src=\"" + kWebServerTomcatShareDirectory + "/" + kWebServerErrorExposuresImage + "\" alt=\"Camera2 Image\" width = \"720\" heigth=\"544\" />");        
-            }
-            else if (result_type_ == GsIPCResultType.kWaitingForBallToAppear )
-            {
+                        "<img src=\"" + kWebServerTomcatShareDirectory + "/" + kWebServerErrorExposuresImage + "\" alt=\"Camera2 Image\" width = \"720\" heigth=\"544\" />");
+            } else if (result_type_ == GsIPCResultType.kWaitingForBallToAppear) {
                 // Make sure the user can see what the monitor is seeing, especially if the user may have placed the ball outside the ball search area
-                request.setAttribute("images", "<img src=\"" + kWebServerTomcatShareDirectory + "/" + kWebServerBallSearchAreaImage + "\" alt=\"Ball Search Area\" width = \"360\" heigth=\"272\" />");        
+                request.setAttribute("images", "<img src=\"" + kWebServerTomcatShareDirectory + "/" + kWebServerBallSearchAreaImage + "\" alt=\"Ball Search Area\" width = \"360\" heigth=\"272\" />");
             }
 
 
@@ -399,27 +387,26 @@ public class MonitorServlet extends HttpServlet {
             if (club_type_ != GsClubType.kPutter) {
                 driver_button_color_string = "#04AA6D";  // Green
                 putter_button_color_string = "#e7e7e7";  // Gray
-            }
-            else {
+            } else {
                 driver_button_color_string = "#e7e7e7";  // Gray
                 putter_button_color_string = "#04AA6D";  // Green
             }
-            
+
             control_buttons_str = "<style> ";
             control_buttons_str += " input[value=\"Putter\"] { background-color: " + putter_button_color_string + ";} ";
             control_buttons_str += " input[value=\"Driver\"] { background-color: " + driver_button_color_string + ";} ";
             control_buttons_str += " </style>";
 
-            control_buttons_str += "<form action=\"monitor\" method=\"post\"> " + 
-                            "<input type=\"submit\" name=\"driver\" value=\"Driver\" background-color: " + driver_button_color_string + "; style=\" font-family: 'Arial'; font-size:30px;\" />  " + 
-                            "<input type=\"submit\" name=\"putter\" value=\"Putter\" background-color: " + putter_button_color_string + "; style=\" font-family: 'Arial'; font-size:30px;\" />  " + 
-                            "<input type=\"submit\" name=\"P1\" value=\"P1\"  background-color: #04AA6D; style=\"font-family: 'Arial'; font-size:30px;\" />" + 
-                            "<input type=\"submit\" name=\"P2\" value=\"P2\" style=\"font-family: 'Arial'; font-size:30px;\" />" + 
-                            "<input type=\"submit\" name=\"P3\" value=\"P3\" style=\"font-family: 'Arial'; font-size:30px;\" />" + 
-                            "<input type=\"submit\" name=\"P4\" value=\"P4\" style=\"font-family: 'Arial'; font-size:30px;\" />" + 
-                            " </form>";
+            control_buttons_str += "<form action=\"monitor\" method=\"post\"> " +
+                    "<input type=\"submit\" name=\"driver\" value=\"Driver\" background-color: " + driver_button_color_string + "; style=\" font-family: 'Arial'; font-size:30px;\" />  " +
+                    "<input type=\"submit\" name=\"putter\" value=\"Putter\" background-color: " + putter_button_color_string + "; style=\" font-family: 'Arial'; font-size:30px;\" />  " +
+                    "<input type=\"submit\" name=\"P1\" value=\"P1\"  background-color: #04AA6D; style=\"font-family: 'Arial'; font-size:30px;\" />" +
+                    "<input type=\"submit\" name=\"P2\" value=\"P2\" style=\"font-family: 'Arial'; font-size:30px;\" />" +
+                    "<input type=\"submit\" name=\"P3\" value=\"P3\" style=\"font-family: 'Arial'; font-size:30px;\" />" +
+                    "<input type=\"submit\" name=\"P4\" value=\"P4\" style=\"font-family: 'Arial'; font-size:30px;\" />" +
+                    " </form>";
             request.setAttribute("control_buttons", control_buttons_str);
-            
+
 
             return s;
         }
@@ -430,57 +417,57 @@ public class MonitorServlet extends HttpServlet {
             switch (t) {
                 case kWaitingForBallToAppear: {
                     s = "Waiting for ball to appear in view frame";
-                break;
+                    break;
                 }
-                
+
                 case kWaitingForSimulatorArmed: {
                     s = "Waiting for the simulator to be armed";
-                break;
+                    break;
                 }
-                
+
                 case kInitializing: {
                     s = "Initializing launch monitor.";
-                break;
+                    break;
                 }
-                
+
                 case kPausingForBallStabilization: {
                     s = "Pausing for the placed ball to stabilize";
-                break;
+                    break;
                 }
-                
+
                 case kMultipleBallsPresent: {
                     s = "Muliple balls present";
-                break;
+                    break;
                 }
 
                 case kBallPlacedAndReadyForHit: {
                     s = "Ball placed and ready to be hit";
-                break;
+                    break;
                 }
 
                 case kHit: {
                     s = "Ball hit";
-                break;
+                    break;
                 }
 
                 case kError: {
                     s = "Error";
-                break;
+                    break;
                 }
- 
+
                 case kUnknown: {
                     s = "Unknown";
-                break;
+                    break;
                 }
- 
+
                 case kCalibrationResults: {
                     s = "CalibrationResults";
-                break;
+                    break;
                 }
- 
+
                 default: {
                     s = "N/A (" + String.valueOf(t.ordinal()) + ")";
-                break;
+                    break;
                 }
             }
 
@@ -504,15 +491,15 @@ public class MonitorServlet extends HttpServlet {
                 switch (a.get(1).getValueType()) {
                     case INTEGER:
                         speed_mpers_ = a.get(1).asIntegerValue().toInt();
-                    break;
+                        break;
 
                     case FLOAT:
                         speed_mpers_ = a.get(1).asFloatValue().toFloat();
-                    break;
-                    
+                        break;
+
                     default:
                         System.out.println("Could not convert speed_mpers_ value");
-                    break;
+                        break;
                 }
 
                 // System.out.println("Unpacked speed_mpers_");
@@ -522,29 +509,29 @@ public class MonitorServlet extends HttpServlet {
                 switch (a.get(2).getValueType()) {
                     case INTEGER:
                         launch_angle_deg_ = a.get(2).asIntegerValue().toInt();
-                    break;
+                        break;
 
                     case FLOAT:
                         launch_angle_deg_ = a.get(2).asFloatValue().toFloat();
-                    break;
-                    
+                        break;
+
                     default:
                         System.out.println("Could not convert launch_angle_deg_ value");
-                    break;
+                        break;
                 }
 
                 switch (a.get(3).getValueType()) {
                     case INTEGER:
                         side_angle_deg_ = a.get(3).asIntegerValue().toInt();
-                    break;
+                        break;
 
                     case FLOAT:
                         side_angle_deg_ = a.get(3).asFloatValue().toFloat();
-                    break;
-                    
+                        break;
+
                     default:
                         System.out.println("Could not convert side_angle_deg_ value");
-                    break;
+                        break;
                 }
 
                 // System.out.println("Unpacking back_spin_rpm_.");
@@ -555,11 +542,11 @@ public class MonitorServlet extends HttpServlet {
 
                 // System.out.println("unpacked club type value: " + String.valueOf(a.get(7).asIntegerValue().toInt()));
 
-                club_type_ = GsClubType.values()[ a.get(7).asIntegerValue().toInt() ];
+                club_type_ = GsClubType.values()[a.get(7).asIntegerValue().toInt()];
 
                 // System.out.println("unpacked club type: " + String.valueOf(club_type_));
 
-                result_type_ = GsIPCResultType.values()[ a.get(8).asIntegerValue().toInt() ];
+                result_type_ = GsIPCResultType.values()[a.get(8).asIntegerValue().toInt()];
 
                 if (!a.get(9).isNilValue()) {
                     message_ = a.get(9).asStringValue().toString();
@@ -572,12 +559,12 @@ public class MonitorServlet extends HttpServlet {
                     ArrayValue log_messages_value = a.get(10).asArrayValue();
 
                     log_messages_.clear();
-                    for (int i = 0; i < log_messages_value.size() ; i++) {
+                    for (int i = 0; i < log_messages_value.size(); i++) {
                         log_messages_.addElement(new String(log_messages_value.get(i).asStringValue().toString()));
                     }
                 }
 
-            } catch(Exception e) {
+            } catch (Exception e) {
                 System.out.println("Error occurred in unpack: " + e.getMessage());
                 return false;
             }
@@ -592,8 +579,9 @@ public class MonitorServlet extends HttpServlet {
     private static String kGolfSimConfigJsonFilename = "golf_sim_config.json";
 
     private static String kGolfSimTopic = "Golf.Sim";
-    // Set from JSON file.  The default should probably be a symbolic address like rsp02
-    private static String kWebActiveMQHostAddress = "tcp://10.0.0.41:61616";
+    // Set from environment variable or default. This can be overidden from config file later
+    private static String kWebActiveMQHostAddress = System.getenv("PITRAC_MSG_BROKER_FULL_ADDRESS") != null ?
+            System.getenv("PITRAC_MSG_BROKER_FULL_ADDRESS") : "tcp://10.0.0.41:61616";
     private static String kWebServerTomcatShareDirectory;
     private static String kWebServerResultBallExposureCandidates;
     private static String kWebServerResultSpinBall1Image;
@@ -639,7 +627,7 @@ public class MonitorServlet extends HttpServlet {
             JsonElement gsConfigElement = jsonObject.get("gs_config");
             JsonElement ipcInterfaceElement = gsConfigElement.getAsJsonObject().get("ipc_interface");
             JsonElement userInterfaceElement = gsConfigElement.getAsJsonObject().get("user_interface");
-            
+
             String pngSuffix = new String(".png");
 
             JsonElement kWebServerTomcatShareDirectoryElement = userInterfaceElement.getAsJsonObject().get("kWebServerTomcatShareDirectory");
@@ -650,9 +638,11 @@ public class MonitorServlet extends HttpServlet {
             JsonElement kWebServerErrorExposuresImageElement = userInterfaceElement.getAsJsonObject().get("kWebServerErrorExposuresImage");
             JsonElement kWebServerBallSearchAreaImageElement = userInterfaceElement.getAsJsonObject().get("kWebServerBallSearchAreaImage");
             JsonElement kRefreshTimeSecondsElement = userInterfaceElement.getAsJsonObject().get("kRefreshTimeSeconds");
-            
-            kWebActiveMQHostAddress = (String) ipcInterfaceElement.getAsJsonObject().get("kWebActiveMQHostAddress").getAsString();
-            
+
+            if (kWebActiveMQHostAddress.isEmpty()) {
+                kWebActiveMQHostAddress = ipcInterfaceElement.getAsJsonObject().get("kWebActiveMQHostAddress").getAsString();
+            }
+
             kWebServerTomcatShareDirectory = (String) kWebServerTomcatShareDirectoryElement.getAsString();
             kWebServerResultBallExposureCandidates = (String) kWebServerResultBallExposureCandidatesElement.getAsString() + pngSuffix;
             kWebServerResultSpinBall1Image = (String) kWebServerResultSpinBall1ImageElement.getAsString() + pngSuffix;
@@ -662,7 +652,7 @@ public class MonitorServlet extends HttpServlet {
             kWebServerBallSearchAreaImage = (String) kWebServerBallSearchAreaImageElement.getAsString() + pngSuffix;
             kRefreshTimeSeconds = (int) kRefreshTimeSecondsElement.getAsInt();
 
-        } catch(Exception e) {
+        } catch (Exception e) {
             System.out.println("Failed to parse JSON config file: " + e.getMessage());
             return false;
         }
@@ -675,7 +665,7 @@ public class MonitorServlet extends HttpServlet {
         System.out.println("  kWebServerResultBallRotatedByBestAngles " + kWebServerResultBallRotatedByBestAngles);
         System.out.println("  kWebServerErrorExposuresImage " + kWebServerErrorExposuresImage);
         System.out.println("  kWebServerBallSearchAreaImage " + kWebServerBallSearchAreaImage);
-        
+
 
         monitorIsInitialized = true;
         return true;
@@ -688,7 +678,6 @@ public class MonitorServlet extends HttpServlet {
     private static int time_since_last_reset_seconds = 0;
 
 
-    
     @Override
     protected void doPost(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
 
@@ -705,11 +694,11 @@ public class MonitorServlet extends HttpServlet {
         }
 
 
-            response.addHeader("Refresh", String.valueOf(0));
-           
-            response.setContentType("text/html");
+        response.addHeader("Refresh", String.valueOf(0));
 
-            request.getRequestDispatcher("/WEB-INF/gs_dashboard.jsp").forward(request, response);
+        response.setContentType("text/html");
+
+        request.getRequestDispatcher("/WEB-INF/gs_dashboard.jsp").forward(request, response);
     }
 
     @Override
@@ -724,8 +713,7 @@ public class MonitorServlet extends HttpServlet {
 
         if (display_images_str == "0") {
             display_images = false;
-        }
-        else {
+        } else {
             display_images = true;
         }
 
@@ -755,10 +743,10 @@ public class MonitorServlet extends HttpServlet {
                 // Connection connection = connectionFactory.createConnection();
                 Connection connection = connectionFactory.createConnection();
                 connection.start();
-    
+
                 // Create a Session
                 Session session = connection.createSession(false, Session.AUTO_ACKNOWLEDGE);
-    
+
                 Destination destination = session.createTopic(kGolfSimTopic);
 
                 // Create a MessageProducer from the Session to the Topic or Queue
@@ -783,9 +771,9 @@ public class MonitorServlet extends HttpServlet {
             HttpSession httpSession = request.getSession();
             Long times = (Long) httpSession.getAttribute("times");
             if (times == null) {
-              httpSession.setAttribute("times", new Long(0));
+                httpSession.setAttribute("times", 0L);
             }
-            
+
             long value = 1;
             if (times != null) {
                 value = (times.longValue()) + 1;
@@ -802,7 +790,7 @@ public class MonitorServlet extends HttpServlet {
             }
 
             response.addHeader("Refresh", String.valueOf(kRefreshTimeSeconds));
-            
+
             response.setContentType("text/html");
 
             String debugDashboard = current_result_.Format(request);
@@ -811,7 +799,7 @@ public class MonitorServlet extends HttpServlet {
 
             // System.out.println("Received data:\n" + debugDashboard);
 
-        } catch(Exception e) {
+        } catch (Exception e) {
             response.getOutputStream().println(e.getMessage());
             return;
         }
@@ -832,10 +820,10 @@ public class MonitorServlet extends HttpServlet {
 
                 Connection connection = connectionFactory.createConnection();
                 connection.start();
-        
+
                 // Create a Session
                 Session session = connection.createSession(false, Session.AUTO_ACKNOWLEDGE);
-        
+
                 // Create the destination (Topic or Queue)
                 Destination destination = session.createTopic(kGolfSimTopic);
 
@@ -852,13 +840,11 @@ public class MonitorServlet extends HttpServlet {
 
                     if (message == null) {
                         continue;
-                    }
-                    else if (message instanceof TextMessage) {
+                    } else if (message instanceof TextMessage) {
                         TextMessage textMessage = (TextMessage) message;
                         String text = textMessage.getText();
                         System.out.println("Received TextMessage: " + text);
-                    }
-                    else if (message instanceof BytesMessage) {
+                    } else if (message instanceof BytesMessage) {
                         BytesMessage bytesMessage = (BytesMessage) message;
                         long length = bytesMessage.getBodyLength();
                         // System.out.println("Received BytesMessage: " + String.valueOf(length) + " bytes.");
@@ -872,14 +858,14 @@ public class MonitorServlet extends HttpServlet {
                         byteData = new byte[(int) length];
                         bytesMessage.readBytes(byteData);
 
-                        // System.out.println("Received BytesMessage"); 
+                        // System.out.println("Received BytesMessage");
 
                         // Make sure this is a result type message, and not something like
                         // a Cam2Image
                         int gs_ipc_message_type_tag = bytesMessage.getIntProperty("IPCMessageType");
 
-                        if (gs_ipc_message_type_tag != 4 /* kResults */ ) {
-                            System.out.println("Received ByesMessage of IPCMessageType: " +String.valueOf(gs_ipc_message_type_tag));
+                        if (gs_ipc_message_type_tag != 4 /* kResults */) {
+                            System.out.println("Received ByesMessage of IPCMessageType: " + String.valueOf(gs_ipc_message_type_tag));
                             continue;
                         }
 
@@ -899,20 +885,18 @@ public class MonitorServlet extends HttpServlet {
                         if (current_result_.speed_mpers_ > 0 || current_result_.result_type_ == GsIPCResultType.kError) {
                             // We may not want to update the screen just yet if it has useful information and
                             // the incoming result record is not very interesting
-                            if (new_result.speed_mpers_ <= 0 && 
-                                (new_result.result_type_ != GsIPCResultType.kBallPlacedAndReadyForHit &&
-                                 new_result.result_type_ != GsIPCResultType.kInitializing &&
-                                 new_result.result_type_ != GsIPCResultType.kWaitingForSimulatorArmed &&
-                                 new_result.result_type_ != GsIPCResultType.kError
-                                )) {
+                            if (new_result.speed_mpers_ <= 0 &&
+                                    (new_result.result_type_ != GsIPCResultType.kBallPlacedAndReadyForHit &&
+                                            new_result.result_type_ != GsIPCResultType.kInitializing &&
+                                            new_result.result_type_ != GsIPCResultType.kWaitingForSimulatorArmed &&
+                                            new_result.result_type_ != GsIPCResultType.kError
+                                    )) {
                                 // Don't replace the current result, as the user may still be looking at it
-                            }
-                            else {
+                            } else {
                                 // A new ball has been teed up, so show the new status
                                 current_result_.unpack(byteData);
                             }
-                        }
-                        else {
+                        } else {
                             // We don't appear to have any prior hit result data
                             current_result_.unpack(byteData);
                         }
