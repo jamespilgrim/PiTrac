@@ -132,15 +132,15 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>BOOST_BIND_GLOBAL_PLACEHOLDERS;BOOST_ALL_DYN_LINK;BOOST_USE_WINAPI_VERSION=0x0A00;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>E:\Dev_Libs\opencv\build\include;E:\Dev_Libs\boost_1_87_0\</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(OPENCV_DIR)\include;$(BOOST_DIR)\</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <DebugInformationFormat>OldStyle</DebugInformationFormat>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalLibraryDirectories>E:\Dev_Libs\opencv\build\x64\vc16\lib;E:\Dev_Libs\boost_1_87_0\lib64-msvc-14.3</AdditionalLibraryDirectories>
-      <AdditionalDependencies>E:\Dev_Libs\opencv\build\x64\vc16\lib\opencv_world4100d.lib;$(CoreLibraryDependencies);%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>$(OPENCV_DIR)\x64\vc16\lib;$(BOOST_DIR)\lib64-msvc-14.3</AdditionalLibraryDirectories>
+      <AdditionalDependencies>opencv_world4110d.lib;$(CoreLibraryDependencies);%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|ARM'">
@@ -149,15 +149,15 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>E:\Dev_Libs\opencv\build\include;E:\Dev_Libs\boost_1_81_0\;E:\Dev_Libs\NumCpp-master\include;</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(OPENCV_DIR)\include;$(BOOST_DIR)\;$(BOOST_DIR)\NumCpp-master\include;</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <DebugInformationFormat>OldStyle</DebugInformationFormat>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalLibraryDirectories>E:\Dev_Libs\opencv\build\x64\vc16\lib;E:\Dev_Libs\boost_1_81_0\stage\lib</AdditionalLibraryDirectories>
-      <AdditionalDependencies>opencv_world490d.lib;$(CoreLibraryDependencies);%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>$(OPENCV_DIR)\x64\vc16\lib;$(BOOST_DIR)\stage\lib</AdditionalLibraryDirectories>
+      <AdditionalDependencies>opencv_world4110d.lib;$(CoreLibraryDependencies);%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -168,7 +168,7 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>E:\Dev_Libs\opencv\build\include;E:\Dev_Libs\boost_1_81_0\;E:\Dev_Libs\boost_1_81_0\boost;E:\Dev_Libs\NumCpp-master\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(OPENCV_DIR)\include;$(BOOST_DIR)\;$(BOOST_DIR)\boost;$(BOOST_DIR)\NumCpp-master\include</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <DebugInformationFormat>OldStyle</DebugInformationFormat>
     </ClCompile>
@@ -177,8 +177,8 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalLibraryDirectories>E:\Dev_Libs\opencv\build\x64\vc16\lib\;E:\Dev_Libs\boost_1_81_0\stage\lib</AdditionalLibraryDirectories>
-      <AdditionalDependencies>opencv_world490.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>$(OPENCV_DIR)\x64\vc16\lib\;$(BOOST_DIR)\stage\lib</AdditionalLibraryDirectories>
+      <AdditionalDependencies>opencv_world4110.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <Profile>true</Profile>
       <GenerateMapFile>true</GenerateMapFile>
     </Link>
@@ -191,7 +191,7 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>E:\Dev_Libs\opencv\build\include;E:\Dev_Libs\boost_1_81_0\;E:\Dev_Libs\boost_1_81_0\boost;E:\Dev_Libs\NumCpp-master\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(OPENCV_DIR)\include;$(BOOST_DIR)\;$(BOOST_DIR)\boost;$(BOOST_DIR)\NumCpp-master\include</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <DebugInformationFormat>OldStyle</DebugInformationFormat>
     </ClCompile>
@@ -200,7 +200,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalLibraryDirectories>E:\Dev_Libs\opencv\build\x64\vc16\lib\;E:\Dev_Libs\boost_1_81_0\stage\lib</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>$(OPENCV_DIR)\x64\vc16\lib\;$(BOOST_DIR)\stage\lib</AdditionalLibraryDirectories>
       <AdditionalDependencies>opencv_world490.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <Profile>true</Profile>
       <GenerateMapFile>true</GenerateMapFile>
