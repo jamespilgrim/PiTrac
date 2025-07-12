@@ -267,6 +267,10 @@
     <ClCompile Include="gs_results.cpp" />
     <ClCompile Include="gs_sim_interface.cpp" />
     <ClCompile Include="gs_sim_socket_interface.cpp" />
+    <ClCompile Include="ImageAnalysis\infrastructure\opencv_image_analyzer.cpp" />
+    <ClCompile Include="ImageAnalysis\tests\test_approval_with_pitrac_images.cpp" />
+    <ClCompile Include="ImageAnalysis\tests\test_image_analysis_domain.cpp" />
+    <ClCompile Include="ImageAnalysis\tests\test_opencv_analyzer.cpp" />
     <ClCompile Include="lm_main.cpp" />
     <ClCompile Include="gs_ipc_mat.cpp" />
     <ClCompile Include="gs_ipc_system.cpp" />
@@ -437,6 +441,12 @@
     <ClInclude Include="gs_sim_interface.h" />
     <ClInclude Include="gs_sim_socket_interface.h" />
     <ClInclude Include="gs_ui_system.h" />
+    <ClInclude Include="ImageAnalysis\application\image_analysis_service.hpp" />
+    <ClInclude Include="ImageAnalysis\domain\analysis_results.hpp" />
+    <ClInclude Include="ImageAnalysis\domain\interfaces.hpp" />
+    <ClInclude Include="ImageAnalysis\domain\value_objects.hpp" />
+    <ClInclude Include="ImageAnalysis\infrastructure\ml_image_analyzer.hpp" />
+    <ClInclude Include="ImageAnalysis\infrastructure\opencv_image_analyzer.hpp" />
     <ClInclude Include="image\image.hpp" />
     <ClInclude Include="libcamera_interface.h" />
     <ClInclude Include="logging_tools.h" />
@@ -520,8 +530,9 @@
     <Text Include="image\CMakeLists.txt" />
     <Text Include="output\CMakeLists.txt" />
     <Text Include="post_processing_stages\CMakeLists.txt" />
-    <Text Include="preview\CMakeLists.txt" />
+    <Text Include="preview\CMakeLists.txt" />  
   </ItemGroup>
+
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>

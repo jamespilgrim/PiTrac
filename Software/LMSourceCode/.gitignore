@@ -364,3 +364,18 @@ FodyWeavers.xsd
 
 # DS_Store files
 .DS_Store
+
+# Approval test artifacts - only ignore received/temporary files
+*.received.*
+**/approval_artifacts/*.received.*
+**/approval_artifacts/*.temp
+**/approval_artifacts/*.empty
+
+# CMake artifacts
+CMakeCache.txt
+cmake_install.cmake
+CTestTestfile.cmake
+
+# CTest generated files and directories
+**/Testing/
+**/CTestCostData.txt
