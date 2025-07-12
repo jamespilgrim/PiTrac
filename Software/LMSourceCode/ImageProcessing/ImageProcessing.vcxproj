@@ -210,6 +210,12 @@
     <ClCompile Include="ball_image_proc.cpp" />
     <ClCompile Include="ball_watcher.cpp" />
     <ClCompile Include="ball_watcher_image_buffer.cpp" />
+    <ClCompile Include="Camera\build\CMakeFiles\4.0.2\CompilerIdCXX\CMakeCXXCompilerId.cpp" />
+    <ClCompile Include="Camera\build\CMakeFiles\4.0.2\CompilerIdC\CMakeCCompilerId.c" />
+    <ClCompile Include="Camera\tests\domain\test_advanced_domain.cpp" />
+    <ClCompile Include="Camera\tests\domain\test_camera_domain.cpp" />
+    <ClCompile Include="Camera\tests\infrastructure\test_platform_selection.cpp" />
+    <ClCompile Include="Camera\tests\test_main.cpp" />
     <ClCompile Include="camera_hardware.cpp" />
     <ClCompile Include="colorsys.cpp" />
     <ClCompile Include="core\dma_heaps.cpp">
@@ -377,6 +383,10 @@
     <ClInclude Include="ball_watcher.h" />
     <ClInclude Include="ball_watcher_image_buffer.h" />
     <ClInclude Include="blocking_queue.h" />
+    <ClInclude Include="Camera\camera_platform.hpp" />
+    <ClInclude Include="Camera\domain\camera_domain.hpp" />
+    <ClInclude Include="Camera\infrastructure\unix\libcamera_unix_impl.hpp" />
+    <ClInclude Include="Camera\tests\test_utilities.hpp" />
     <ClInclude Include="camera_hardware.h" />
     <ClInclude Include="colorsys.h" />
     <ClInclude Include="core\buffer_sync.hpp">
