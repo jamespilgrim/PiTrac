@@ -4,12 +4,13 @@
  */
 
 #ifdef __unix__  // Ignore in Windows environment
-#include <bcm_host.h>
 #endif
 #include <boost/foreach.hpp>
 #include <cstdlib>
 #include <memory>
-
+#include <fstream>
+#include <string>
+#include <sstream>
 #include "logging_tools.h"
 #include "gs_camera.h"
 #include "gs_ui_system.h"
@@ -104,35 +105,27 @@ namespace golf_sim {
 
 	// TBD - Will need to be improved to adapt to having two cameras on the same
 	// Pi.
-	GolfSimConfiguration::PiModel GolfSimConfiguration::GetPiModel() {
-		GolfSimConfiguration::PiModel pi_model  = kRPi5;
+GolfSimConfiguration::PiModel GolfSimConfiguration::GetPiModel() {
+     GolfSimConfiguration::PiModel pi_model = kRPi5; // default fallback
 
-#ifdef __unix__  // Ignore in Windows environment
-		int processor_type = bcm_host_get_processor_id();
+    std::ifstream cpuinfo("/proc/cpuinfo");
+    std::string line;
 
-		GS_LOG_TRACE_MSG(trace, "GolfSimConfiguration - bcm_host_get_processor_id returned:" + std::to_string(processor_type));
+    while (std::getline(cpuinfo, line)) {
+        // Check for 'Model' field
+        if (line.find("Model") != std::string::npos) {
+            if (line.find("Raspberry Pi 4") != std::string::npos) {
+                pi_model = kRPi4;
+            } else if (line.find("Raspberry Pi 5") != std::string::npos) {
+                pi_model = kRPi5;
+            }
+            break;
+        }
 
-		switch (processor_type) {
-			/** NOT IMPLEMENTED YET 
-			case BCM_HOST_PROCESSOR_BCM2712:
-				pi_model = kRPi5;
-				break;
-			**/
-			case BCM_HOST_PROCESSOR_BCM2837:
-				pi_model = kRPi5;
-				break;
+    }
 
-			case BCM_HOST_PROCESSOR_BCM2711:
-					pi_model = kRPi4;
-					break;
-
-			default:
-				pi_model = kRPi5;
-				break;
-		}
-#endif	
-		return pi_model;
-	}
+    return pi_model;
+}
 
 
 bool GolfSimConfiguration::ReadValues() {
