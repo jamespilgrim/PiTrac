@@ -63,6 +63,10 @@ boost_dep = dependency('boost', method: 'pkg-config', version : '>=1.74.0', modu
 
 msgpack_dep = dependency('msgpack-cxx', required : true)
 
+# libshotscope integration as subproject
+libshotscope_subproj = subproject('libshotscope', default_options: ['cpp_std=c++17'])
+libshotscope_dep = libshotscope_subproj.get_variable('libshotscope_dep')
+
 rpicam_app_src = []
 rpicam_app_dep = [libcamera_dep, lgpio_dep]
 
@@ -188,6 +192,7 @@ pitrac_lm_sources += ([
                         'gs_ipc_message.cpp',
                         'gs_ipc_control_msg.cpp',
                         'gs_results.cpp',
+                        'gs_trajectory_calc.cpp',
                         'gs_gspro_results.cpp',
                         'gs_ui_system.cpp',
                         'gs_ipc_mat.cpp',
