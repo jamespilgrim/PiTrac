@@ -277,8 +277,8 @@
         },
         "testing": {
             "kBaseTestImageDir": "/usr/share/pitrac/test-images/",
-            "kTwoImageTestTeedBallImage": "/usr/share/pitrac/test-images/teed-ball.png",
-            "kTwoImageTestStrobedImage": "/usr/share/pitrac/test-images/strobed.png",
+            "kTwoImageTestTeedBallImage": "teed-ball.png",
+            "kTwoImageTestStrobedImage": "strobed.png",
             "kAutomatedTestSuiteDirectory": "~/LM_Shares/TestData/",
             "kAutomatedTestExpectedResultsCSV": "expected_results.csv",
             "kAutomatedTestResultsCSV": "test_results.csv",

@@ -526,23 +526,47 @@ cmd_test() {
             
             export LD_LIBRARY_PATH="/usr/lib/pitrac:${LD_LIBRARY_PATH:-}"
             export PITRAC_ROOT="/usr/lib/pitrac"
-            cd /usr/lib/pitrac
-            ./pitrac_lm --pulse_test --system_mode=camera1 --logging_level=info
+            export PITRAC_BASE_IMAGE_LOGGING_DIR="${HOME}/LM_Shares/Images/"
+            /usr/lib/pitrac/pitrac_lm --pulse_test --system_mode=camera1 --logging_level=info
             ;;
         quick)
             echo "Running PiTrac quick test..."
             echo "This will start PiTrac in test mode and exit"
+            
+            # Copy config if not present
+            if [[ ! -f "golf_sim_config.json" ]]; then
+                if [[ -f "/etc/pitrac/golf_sim_config.json" ]]; then
+                    echo "Copying config file to current directory..."
+                    cp /etc/pitrac/golf_sim_config.json .
+                else
+                    echo "ERROR: Config file not found. Please copy /etc/pitrac/golf_sim_config.json to current directory"
+                    exit 1
+                fi
+            fi
+            
             export LD_LIBRARY_PATH="/usr/lib/pitrac:${LD_LIBRARY_PATH:-}"
             export PITRAC_ROOT="/usr/lib/pitrac"
-            cd /usr/lib/pitrac
-            ./pitrac_lm --system_mode=test "$@"
+            export PITRAC_BASE_IMAGE_LOGGING_DIR="${HOME}/LM_Shares/Images/"
+            /usr/lib/pitrac/pitrac_lm --system_mode=test "$@"
             ;;
         camera1|camera2)
             echo "Running PiTrac ${2} standalone test..."
+            
+            # Copy config if not present
+            if [[ ! -f "golf_sim_config.json" ]]; then
+                if [[ -f "/etc/pitrac/golf_sim_config.json" ]]; then
+                    echo "Copying config file to current directory..."
+                    cp /etc/pitrac/golf_sim_config.json .
+                else
+                    echo "ERROR: Config file not found. Please copy /etc/pitrac/golf_sim_config.json to current directory"
+                    exit 1
+                fi
+            fi
+            
             export LD_LIBRARY_PATH="/usr/lib/pitrac:${LD_LIBRARY_PATH:-}"
             export PITRAC_ROOT="/usr/lib/pitrac"
-            cd /usr/lib/pitrac
-            ./pitrac_lm --system_mode="${2}_test_standalone" "$@"
+            export PITRAC_BASE_IMAGE_LOGGING_DIR="${HOME}/LM_Shares/Images/"
+            /usr/lib/pitrac/pitrac_lm --system_mode="${2}_test_standalone" "$@"
             ;;
         *)
             echo "Usage: pitrac test [hardware|pulse|quick|camera1|camera2]"
