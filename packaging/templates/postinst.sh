@@ -1,0 +1,169 @@
+#!/bin/bash
+set -e
+
+# Function to detect Pi model
+detect_pi_model() {
+    if grep -q "Raspberry Pi 5" /proc/cpuinfo 2>/dev/null; then
+        echo "pi5"
+    elif grep -q "Raspberry Pi 4" /proc/cpuinfo 2>/dev/null; then
+        echo "pi4"
+    else
+        echo "unknown"
+    fi
+}
+
+case "$1" in
+    configure)
+        echo "Configuring PiTrac..."
+        
+        # Detect Pi model
+        PI_MODEL=$(detect_pi_model)
+        echo "Detected Pi model: $PI_MODEL"
+        
+        # Create tomee user/group
+        if ! getent group tomee >/dev/null; then
+            groupadd -r tomee
+        fi
+        if ! getent passwd tomee >/dev/null; then
+            useradd -r -g tomee -d /opt/tomee -s /bin/false tomee
+        fi
+        
+        # Get the actual user who invoked sudo (if any)
+        ACTUAL_USER="${SUDO_USER:-}"
+        if [ -z "$ACTUAL_USER" ]; then
+            echo "Note: Run 'pitrac setup' as your regular user to complete setup"
+        else
+            # Add user to required groups
+            usermod -a -G video,gpio,i2c,spi,dialout "$ACTUAL_USER" 2>/dev/null || true
+            
+            # Create user directories
+            USER_HOME=$(getent passwd "$ACTUAL_USER" | cut -d: -f6)
+            if [ -n "$USER_HOME" ] && [ -d "$USER_HOME" ]; then
+                mkdir -p "$USER_HOME/.pitrac"/{config,cache,state,calibration}
+                mkdir -p "$USER_HOME/LM_Shares"/{Images,WebShare}
+                chown -R "$ACTUAL_USER:$ACTUAL_USER" "$USER_HOME/.pitrac" "$USER_HOME/LM_Shares"
+                
+                # Copy default config to user directory if it doesn't exist
+                if [ ! -f "$USER_HOME/.pitrac/config/pitrac.yaml" ]; then
+                    cp /etc/pitrac/pitrac.yaml "$USER_HOME/.pitrac/config/pitrac.yaml"
+                    chown "$ACTUAL_USER:$ACTUAL_USER" "$USER_HOME/.pitrac/config/pitrac.yaml"
+                fi
+            fi
+        fi
+        
+        # System config should be root-owned and world-readable
+        chown root:root /etc/pitrac
+        chmod 755 /etc/pitrac
+        chown root:root /etc/pitrac/pitrac.yaml
+        chmod 644 /etc/pitrac/pitrac.yaml
+        if [ -f /etc/pitrac/golf_sim_config.json ]; then
+            chown root:root /etc/pitrac/golf_sim_config.json
+            chmod 644 /etc/pitrac/golf_sim_config.json
+        fi
+        
+        # Set TomEE permissions
+        chown -R tomee:tomee /opt/tomee
+        chmod 755 /opt/tomee/bin/*.sh
+        
+        # Apply Boost C++20 fix
+        if [ -f /usr/include/boost/asio/awaitable.hpp ] && ! grep -q "#include <utility>" /usr/include/boost/asio/awaitable.hpp; then
+            echo "Applying Boost 1.74 C++20 compatibility fix..."
+            sed -i '/namespace boost {/i #include <utility>' /usr/include/boost/asio/awaitable.hpp
+        fi
+        
+        # Configure boot settings based on Pi model
+        if [ "$PI_MODEL" = "pi5" ]; then
+            CONFIG_FILE="/boot/firmware/config.txt"
+        else
+            CONFIG_FILE="/boot/config.txt"
+        fi
+        
+        # Check if config file exists at alternate location
+        if [ ! -f "$CONFIG_FILE" ] && [ "$CONFIG_FILE" = "/boot/firmware/config.txt" ]; then
+            CONFIG_FILE="/boot/firmware/config.txt"
+        fi
+        
+        if [ -f "$CONFIG_FILE" ]; then
+            echo "Configuring boot settings in $CONFIG_FILE..."
+            
+            # Add settings if not present
+            grep -q "camera_auto_detect=1" "$CONFIG_FILE" || echo "camera_auto_detect=1" >> "$CONFIG_FILE"
+            grep -q "dtparam=i2c_arm=on" "$CONFIG_FILE" || echo "dtparam=i2c_arm=on" >> "$CONFIG_FILE"
+            grep -q "dtparam=spi=on" "$CONFIG_FILE" || echo "dtparam=spi=on" >> "$CONFIG_FILE"
+            grep -q "force_turbo=1" "$CONFIG_FILE" || echo "force_turbo=1" >> "$CONFIG_FILE"
+            
+            if [ "$PI_MODEL" = "pi5" ]; then
+                grep -q "arm_boost=1" "$CONFIG_FILE" || echo "arm_boost=1" >> "$CONFIG_FILE"
+            else
+                grep -q "gpu_mem=256" "$CONFIG_FILE" || echo "gpu_mem=256" >> "$CONFIG_FILE"
+            fi
+        fi
+        
+        # Configure camera timeout
+        if [ "$PI_MODEL" = "pi5" ]; then
+            CAMERA_CONFIG="/usr/share/libcamera/pipeline/rpi/pisp/rpi_apps.yaml"
+        else
+            CAMERA_CONFIG="/usr/share/libcamera/pipeline/rpi/vc4/rpi_apps.yaml"
+        fi
+        
+        if [ ! -f "$CAMERA_CONFIG" ]; then
+            # Try to create from example
+            CAMERA_DIR=$(dirname "$CAMERA_CONFIG")
+            if [ -f "$CAMERA_DIR/example.yaml" ]; then
+                cp "$CAMERA_DIR/example.yaml" "$CAMERA_CONFIG"
+            fi
+        fi
+        
+        if [ -f "$CAMERA_CONFIG" ] && ! grep -q "camera_timeout_value_ms" "$CAMERA_CONFIG"; then
+            echo "Configuring camera timeout..."
+            sed -i '/pipeline:/a\    "camera_timeout_value_ms": 1000000,' "$CAMERA_CONFIG"
+        fi
+        
+        # Update library cache
+        ldconfig
+        
+        # Reload systemd
+        systemctl daemon-reload
+        
+        # Configure ActiveMQ instance
+        if [ -d /etc/activemq/instances-available ] && [ ! -e /etc/activemq/instances-enabled/main ]; then
+            echo "Enabling ActiveMQ main instance..."
+            ln -sf /etc/activemq/instances-available/main /etc/activemq/instances-enabled/main
+            systemctl restart activemq || true
+        fi
+        
+        # Enable services (but don't start)
+        systemctl enable pitrac.service || true
+        systemctl enable tomee.service || true
+        
+        echo ""
+        echo "======================================"
+        echo " PiTrac installed!"
+        echo "======================================"
+        echo ""
+        echo "Get started:"
+        echo "  pitrac setup    - Set up your directories"
+        echo "  pitrac test     - Check your cameras"
+        echo "  pitrac run      - Start tracking shots"
+        echo ""
+        echo "The broker and web server start automatically when you run PiTrac."
+        echo ""
+        echo "Need help? Try 'pitrac help' or 'pitrac status'"
+        echo ""
+        
+        # Suggest reboot if Pi model detected
+        if [ "$PI_MODEL" != "unknown" ]; then
+            echo "Note: A reboot is recommended to apply boot configuration changes."
+        fi
+        ;;
+    
+    abort-upgrade|abort-remove|abort-deconfigure)
+        ;;
+    
+    *)
+        echo "postinst called with unknown argument: $1" >&2
+        exit 1
+        ;;
+esac
+
+exit 0

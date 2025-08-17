@@ -1,0 +1,48 @@
+# PiTrac Configuration
+version: 1.0
+
+# System settings
+system:
+  mode: single  # single or dual
+  camera_role: camera1  # camera1 or camera2 (for dual setup)
+
+# Hardware settings
+hardware:
+  gpio_chip: auto  # auto, 0 (Pi4), or 4 (Pi5)
+  pi_model: auto   # auto, pi4, or pi5
+
+# Camera settings
+cameras:
+  slot1:
+    type: 4  # 4=Pi GS, 6=Innomaker
+    index: 1
+  slot2:
+    type: 4
+    index: 2
+
+# Network settings
+network:
+  broker:
+    full_address: tcp://localhost:61616
+    host: localhost
+    port: 61616
+  tomee:
+    host: localhost
+    port: 8080
+
+# Storage paths (~ will be expanded to user home)
+storage:
+  images: ~/LM_Shares/Images/
+  web: ~/LM_Shares/WebShare/
+
+# Simulator interfaces
+simulators:
+  e6:
+    enabled: false
+    host: ""
+  gspro:
+    enabled: false
+    host: ""
+  trugolf:
+    enabled: false
+    host: ""
