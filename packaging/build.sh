@@ -304,6 +304,36 @@ build_dev() {
     # Update library cache
     ldconfig
     
+    # Create pkg-config files for libraries that don't have them
+    log_info "Creating pkg-config files..."
+    mkdir -p /usr/lib/pkgconfig
+    
+    # Create lgpio.pc (the Pi repo package doesn't include one)
+    cat > /usr/lib/pkgconfig/lgpio.pc << 'EOF'
+prefix=/usr
+exec_prefix=${prefix}
+libdir=${exec_prefix}/lib/aarch64-linux-gnu
+includedir=${prefix}/include
+
+Name: lgpio
+Description: GPIO library for Linux
+Version: 0.2.2
+Libs: -L${libdir} -llgpio
+Cflags: -I${includedir}
+EOF
+    
+    # Create msgpack-cxx.pc (header-only library)
+    cat > /usr/lib/pkgconfig/msgpack-cxx.pc << 'EOF'
+prefix=/usr
+exec_prefix=${prefix}
+includedir=${prefix}/include
+
+Name: msgpack-cxx
+Description: MessagePack implementation for C++
+Version: 4.1.3
+Cflags: -I${includedir}
+EOF
+    
     # Build PiTrac
     log_info "Building PiTrac..."
     cd "$REPO_ROOT/Software/LMSourceCode/ImageProcessing"
