@@ -40,6 +40,32 @@ get_gpio_chip() {
     fi
 }
 
+setup_camera_env() {
+    # Read camera and lens types from pitrac.yaml config
+    # Defaults: Camera type 4 (Pi GS), Lens type 1 (6mm)
+    if [[ -f "$CONFIG_FILE" ]]; then
+        # Camera types
+        SLOT1_TYPE=$(grep -A3 "^  slot1:" "$CONFIG_FILE" | grep "type:" | awk '{print $2}' | cut -d'#' -f1 | tr -d ' ')
+        SLOT2_TYPE=$(grep -A3 "^  slot2:" "$CONFIG_FILE" | grep "type:" | awk '{print $2}' | cut -d'#' -f1 | tr -d ' ')
+        export PITRAC_SLOT1_CAMERA_TYPE="${SLOT1_TYPE:-4}"
+        export PITRAC_SLOT2_CAMERA_TYPE="${SLOT2_TYPE:-4}"
+        
+        # Lens types (optional)
+        SLOT1_LENS=$(grep -A3 "^  slot1:" "$CONFIG_FILE" | grep "lens:" | awk '{print $2}' | cut -d'#' -f1 | tr -d ' ')
+        SLOT2_LENS=$(grep -A3 "^  slot2:" "$CONFIG_FILE" | grep "lens:" | awk '{print $2}' | cut -d'#' -f1 | tr -d ' ')
+        if [[ -n "$SLOT1_LENS" ]]; then
+            export PITRAC_SLOT1_LENS_TYPE="$SLOT1_LENS"
+        fi
+        if [[ -n "$SLOT2_LENS" ]]; then
+            export PITRAC_SLOT2_LENS_TYPE="$SLOT2_LENS"
+        fi
+    else
+        export PITRAC_SLOT1_CAMERA_TYPE="4"
+        export PITRAC_SLOT2_CAMERA_TYPE="4"
+        # Lens types are optional - only set if explicitly configured
+    fi
+}
+
 cmd_run() {
     echo "Setting environment variables..."
     
@@ -47,8 +73,9 @@ cmd_run() {
     export PITRAC_BASE_IMAGE_LOGGING_DIR="${HOME}/LM_Shares/Images/"
     export PITRAC_WEBSERVER_SHARE_DIR="${HOME}/LM_Shares/WebShare/"
     export PITRAC_MSG_BROKER_FULL_ADDRESS="tcp://localhost:61616"
-    export PITRAC_SLOT1_CAMERA_TYPE="4"
-    export PITRAC_SLOT2_CAMERA_TYPE="4"
+    
+    # Set up camera environment variables from config
+    setup_camera_env
     
     # Check if golf_sim_config.json exists in current directory
     if [[ ! -f "golf_sim_config.json" ]]; then
@@ -234,30 +261,53 @@ cmd_config() {
     case "${2:-}" in
         edit)
             ${EDITOR:-nano} "$CONFIG_FILE"
+            echo ""
+            echo "Note: For network, storage, and simulator settings, edit golf_sim_config.json"
             ;;
         show)
             cat "$CONFIG_FILE"
             ;;
-        get)
-            if [[ -n "${3:-}" ]]; then
-                grep "$3" "$CONFIG_FILE" || echo "Key not found"
-            else
-                echo "Usage: pitrac config get <key>"
-            fi
-            ;;
-        set)
-            if [[ -n "${3:-}" ]] && [[ -n "${4:-}" ]]; then
-                # This is simplified - real implementation would use proper YAML parser
-                sed -i "s/^$3:.*/$3: $4/" "$CONFIG_FILE"
-                echo "Updated $3"
-            else
-                echo "Usage: pitrac config set <key> <value>"
-            fi
+        cameras)
+            echo "Camera Configuration:"
+            echo "  Slot 1: Type $(grep -A3 "^  slot1:" "$CONFIG_FILE" | grep "type:" | awk '{print $2}'), Lens $(grep -A3 "^  slot1:" "$CONFIG_FILE" | grep "lens:" | awk '{print $2}')"
+            echo "  Slot 2: Type $(grep -A3 "^  slot2:" "$CONFIG_FILE" | grep "type:" | awk '{print $2}'), Lens $(grep -A3 "^  slot2:" "$CONFIG_FILE" | grep "lens:" | awk '{print $2}')"
+            echo ""
+            echo "Camera Types: 1=PiCam1.3, 2=PiCam2, 3=PiHQ, 4=PiGS, 5=InnoMaker"
+            echo "Lens Types: 1=6mm, 2=3.6mm_M12"
             ;;
         validate)
             echo "Validating configuration..."
-            # Add validation logic here
-            echo "Configuration appears valid"
+            local valid=true
+            
+            # Check camera types are valid (1-5)
+            SLOT1_TYPE=$(grep -A3 "^  slot1:" "$CONFIG_FILE" | grep "type:" | awk '{print $2}' | cut -d'#' -f1 | tr -d ' ')
+            SLOT2_TYPE=$(grep -A3 "^  slot2:" "$CONFIG_FILE" | grep "type:" | awk '{print $2}' | cut -d'#' -f1 | tr -d ' ')
+            
+            if [[ ! "$SLOT1_TYPE" =~ ^[1-5]$ ]]; then
+                echo "Error: Invalid camera type for slot1: $SLOT1_TYPE (must be 1-5)"
+                valid=false
+            fi
+            if [[ ! "$SLOT2_TYPE" =~ ^[1-5]$ ]]; then
+                echo "Error: Invalid camera type for slot2: $SLOT2_TYPE (must be 1-5)"
+                valid=false
+            fi
+            
+            # Check lens types if specified (1-2)
+            SLOT1_LENS=$(grep -A3 "^  slot1:" "$CONFIG_FILE" | grep "lens:" | awk '{print $2}' | cut -d'#' -f1 | tr -d ' ')
+            SLOT2_LENS=$(grep -A3 "^  slot2:" "$CONFIG_FILE" | grep "lens:" | awk '{print $2}' | cut -d'#' -f1 | tr -d ' ')
+            
+            if [[ -n "$SLOT1_LENS" ]] && [[ ! "$SLOT1_LENS" =~ ^[1-2]$ ]]; then
+                echo "Error: Invalid lens type for slot1: $SLOT1_LENS (must be 1-2)"
+                valid=false
+            fi
+            if [[ -n "$SLOT2_LENS" ]] && [[ ! "$SLOT2_LENS" =~ ^[1-2]$ ]]; then
+                echo "Error: Invalid lens type for slot2: $SLOT2_LENS (must be 1-2)"
+                valid=false
+            fi
+            
+            if [[ "$valid" == "true" ]]; then
+                echo "Configuration is valid"
+            fi
             ;;
         reset)
             echo "Resetting to default configuration..."
@@ -269,7 +319,13 @@ cmd_config() {
             fi
             ;;
         *)
-            echo "Usage: pitrac config {edit|show|get|set|validate|reset}"
+            echo "Usage: pitrac config {edit|show|cameras|validate|reset}"
+            echo ""
+            echo "  edit     - Edit configuration file"
+            echo "  show     - Display current configuration"
+            echo "  cameras  - Show camera and lens configuration"
+            echo "  validate - Check configuration is valid"
+            echo "  reset    - Reset to default configuration"
             ;;
     esac
 }
@@ -527,6 +583,7 @@ cmd_test() {
             export LD_LIBRARY_PATH="/usr/lib/pitrac:${LD_LIBRARY_PATH:-}"
             export PITRAC_ROOT="/usr/lib/pitrac"
             export PITRAC_BASE_IMAGE_LOGGING_DIR="${HOME}/LM_Shares/Images/"
+            setup_camera_env
             /usr/lib/pitrac/pitrac_lm --pulse_test --system_mode=camera1 --logging_level=info
             ;;
         quick)
@@ -547,6 +604,7 @@ cmd_test() {
             export LD_LIBRARY_PATH="/usr/lib/pitrac:${LD_LIBRARY_PATH:-}"
             export PITRAC_ROOT="/usr/lib/pitrac"
             export PITRAC_BASE_IMAGE_LOGGING_DIR="${HOME}/LM_Shares/Images/"
+            setup_camera_env
             /usr/lib/pitrac/pitrac_lm --system_mode=test "$@"
             ;;
         camera1|camera2)
@@ -566,6 +624,7 @@ cmd_test() {
             export LD_LIBRARY_PATH="/usr/lib/pitrac:${LD_LIBRARY_PATH:-}"
             export PITRAC_ROOT="/usr/lib/pitrac"
             export PITRAC_BASE_IMAGE_LOGGING_DIR="${HOME}/LM_Shares/Images/"
+            setup_camera_env
             /usr/lib/pitrac/pitrac_lm --system_mode="${2}_test_standalone" "$@"
             ;;
         *)
@@ -646,10 +705,9 @@ Main Commands:
   version          Version info
 
 Config:
-  config edit      Open config in editor
+  config edit      Edit pitrac.yaml (cameras, system mode)
   config show      View current config
-  config get KEY   Get a config value
-  config set KEY VALUE  Set a config value
+  config cameras   Show camera and lens settings
   config validate  Check config is valid
   config reset     Reset to defaults
 
