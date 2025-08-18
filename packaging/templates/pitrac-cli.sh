@@ -639,6 +639,7 @@ cmd_test() {
         quick)
             echo "Running PiTrac quick test..."
             echo "This will test image processing (no camera required)"
+            echo ""
             
             # Copy config if not present
             if [[ ! -f "golf_sim_config.json" ]]; then
@@ -655,11 +656,19 @@ cmd_test() {
             export PITRAC_ROOT="/usr/lib/pitrac"
             export PITRAC_BASE_IMAGE_LOGGING_DIR="${HOME}/LM_Shares/Images/"
             setup_camera_env
-            /usr/lib/pitrac/pitrac_lm --system_mode=test "$@"
+            
+            echo "Processing test images..."
+            echo "================================"
+            /usr/lib/pitrac/pitrac_lm --system_mode=test --logging_level=info "$@"
+            
+            # Ignore exit code since the test doesn't return 0 even on success
+            echo "================================"
+            echo "Test complete. Check output above for ball detection results."
             ;;
         spin)
             echo "Running spin analysis test..."
             echo "This tests spin detection algorithms (no camera required)"
+            echo ""
             
             if [[ ! -f "golf_sim_config.json" ]]; then
                 if [[ -f "/etc/pitrac/golf_sim_config.json" ]]; then
@@ -671,19 +680,31 @@ cmd_test() {
             export PITRAC_ROOT="/usr/lib/pitrac"
             export PITRAC_BASE_IMAGE_LOGGING_DIR="${HOME}/LM_Shares/Images/"
             setup_camera_env
-            /usr/lib/pitrac/pitrac_lm --system_mode=test_spin "$@"
+            
+            echo "Processing spin detection..."
+            echo "================================"
+            /usr/lib/pitrac/pitrac_lm --system_mode=test_spin --logging_level=info "$@"
+            echo "================================"
+            echo "Spin test complete."
             ;;
         gspro)
             echo "Testing GSPro server connection..."
+            echo ""
             
             export LD_LIBRARY_PATH="/usr/lib/pitrac:${LD_LIBRARY_PATH:-}"
             export PITRAC_ROOT="/usr/lib/pitrac"
             setup_camera_env
-            /usr/lib/pitrac/pitrac_lm --system_mode=test_gspro_server "$@"
+            
+            echo "Connecting to GSPro..."
+            echo "================================"
+            /usr/lib/pitrac/pitrac_lm --system_mode=test_gspro_server --logging_level=info "$@"
+            echo "================================"
+            echo "GSPro test complete."
             ;;
         automated)
             echo "Running automated test suite..."
             echo "This uses test data files (no camera required)"
+            echo ""
             
             if [[ ! -f "golf_sim_config.json" ]]; then
                 if [[ -f "/etc/pitrac/golf_sim_config.json" ]]; then
@@ -695,10 +716,17 @@ cmd_test() {
             export PITRAC_ROOT="/usr/lib/pitrac"
             export PITRAC_BASE_IMAGE_LOGGING_DIR="${HOME}/LM_Shares/Images/"
             setup_camera_env
-            /usr/lib/pitrac/pitrac_lm --system_mode=automated_testing "$@"
+            
+            echo "Running test suite..."
+            echo "================================"
+            /usr/lib/pitrac/pitrac_lm --system_mode=automated_testing --logging_level=info "$@"
+            echo "================================"
+            echo "Automated test suite complete."
             ;;
         camera1|camera2)
             echo "Running PiTrac ${2} standalone test..."
+            echo "Note: This test requires ${2} to be connected"
+            echo ""
             
             # Copy config if not present
             if [[ ! -f "golf_sim_config.json" ]]; then
@@ -715,7 +743,12 @@ cmd_test() {
             export PITRAC_ROOT="/usr/lib/pitrac"
             export PITRAC_BASE_IMAGE_LOGGING_DIR="${HOME}/LM_Shares/Images/"
             setup_camera_env
-            /usr/lib/pitrac/pitrac_lm --system_mode="${2}_test_standalone" "$@"
+            
+            echo "Testing ${2}..."
+            echo "================================"
+            /usr/lib/pitrac/pitrac_lm --system_mode="${2}_test_standalone" --logging_level=info "$@"
+            echo "================================"
+            echo "${2} test complete."
             ;;
         *)
             echo "Usage: pitrac test [hardware|pulse|quick|spin|gspro|automated|camera1|camera2]"
