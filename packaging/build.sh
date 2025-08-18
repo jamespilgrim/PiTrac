@@ -16,6 +16,14 @@ log_warn() { echo -e "${YELLOW}[WARN]${NC} $*"; }
 log_error() { echo -e "${RED}[ERROR]${NC} $*" >&2; }
 log_success() { echo -e "${GREEN}[✓]${NC} $*"; }
 
+# Setup QEMU for cross-platform builds
+setup_qemu() {
+    if ! docker run --rm --privileged multiarch/qemu-user-static --reset -p yes &>/dev/null; then
+        log_warn "Setting up QEMU for ARM64 emulation..."
+        docker run --rm --privileged multiarch/qemu-user-static --reset -p yes
+    fi
+}
+
 ACTION="${1:-build}"
 FORCE_REBUILD="${2:-false}"
 
@@ -87,6 +95,9 @@ build_pitrac() {
         exit 1
     fi
     
+    # Setup QEMU for ARM64 emulation on x86_64
+    setup_qemu
+    
     # Build Docker image
     log_info "Building PiTrac Docker image..."
     docker build \
@@ -125,6 +136,9 @@ run_shell() {
         log_error "Missing dependency artifacts. Run: $0 deps"
         exit 1
     fi
+    
+    # Setup QEMU for ARM64 emulation on x86_64
+    setup_qemu
     
     # Ensure image exists
     if ! docker image inspect pitrac-poc:arm64 &>/dev/null; then

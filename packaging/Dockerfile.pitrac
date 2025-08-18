@@ -126,5 +126,6 @@ CMD ["bash", "-c", "cd /build/Software/LMSourceCode/ImageProcessing && \
     mkdir -p ClosedSourceObjectFiles && \
     touch ClosedSourceObjectFiles/gs_e6_response.cpp.o && \
     rm -rf build && \
+    find /build -type f -newer /etc/passwd -exec touch {} \\; 2>/dev/null || true && \
     meson setup build --buildtype=release -Denable_recompile_closed_source=false && \
     ninja -C build pitrac_lm"]
