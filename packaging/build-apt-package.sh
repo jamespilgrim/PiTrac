@@ -246,6 +246,10 @@ create_configs() {
 
     cp "$SCRIPT_DIR/templates/pitrac.service" "$DEB_DIR/etc/systemd/system/pitrac.service"
     cp "$SCRIPT_DIR/templates/tomee.service" "$DEB_DIR/etc/systemd/system/tomee.service"
+    
+    # Install tomee wrapper script
+    cp "$SCRIPT_DIR/templates/tomee-wrapper.sh" "$DEB_DIR/usr/lib/pitrac/tomee-wrapper.sh"
+    chmod 755 "$DEB_DIR/usr/lib/pitrac/tomee-wrapper.sh"
 
     log_success "Configs created"
 }

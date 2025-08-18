@@ -128,8 +128,10 @@ case "$1" in
         # Configure ActiveMQ instance
         if [ -d /etc/activemq/instances-available ] && [ ! -e /etc/activemq/instances-enabled/main ]; then
             echo "Enabling ActiveMQ main instance..."
+            # Clean up any existing instances first
+            rm -f /etc/activemq/instances-enabled/*
             ln -sf /etc/activemq/instances-available/main /etc/activemq/instances-enabled/main
-            systemctl restart activemq || true
+            # Don't start it here - let the user or pitrac CLI handle it
         fi
         
         # Enable services (but don't start)
