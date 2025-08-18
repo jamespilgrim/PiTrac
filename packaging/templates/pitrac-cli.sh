@@ -51,8 +51,8 @@ setup_camera_env() {
         export PITRAC_SLOT2_CAMERA_TYPE="${SLOT2_TYPE:-4}"
         
         # Lens types (optional)
-        SLOT1_LENS=$(grep -A3 "^  slot1:" "$CONFIG_FILE" | grep "lens:" | awk '{print $2}' | cut -d'#' -f1 | tr -d ' ')
-        SLOT2_LENS=$(grep -A3 "^  slot2:" "$CONFIG_FILE" | grep "lens:" | awk '{print $2}' | cut -d'#' -f1 | tr -d ' ')
+        SLOT1_LENS=$(grep -A3 "^  slot1:" "$CONFIG_FILE" | grep "lens:" | awk '{print $2}' | cut -d'#' -f1 | tr -d ' ' || true)
+        SLOT2_LENS=$(grep -A3 "^  slot2:" "$CONFIG_FILE" | grep "lens:" | awk '{print $2}' | cut -d'#' -f1 | tr -d ' ' || true)
         if [[ -n "$SLOT1_LENS" ]]; then
             export PITRAC_SLOT1_LENS_TYPE="$SLOT1_LENS"
         fi
