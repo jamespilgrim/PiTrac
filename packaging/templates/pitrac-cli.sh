@@ -543,11 +543,61 @@ cmd_activemq() {
 }
 
 cmd_calibrate() {
-    if [[ -f "/usr/lib/pitrac/calibration-wizard" ]]; then
-        exec /usr/lib/pitrac/calibration-wizard "$@"
-    else
-        echo "Calibration wizard not installed"
-    fi
+    case "${2:-manual}" in
+        camera1)
+            echo "Running Camera 1 calibration..."
+            export LD_LIBRARY_PATH="/usr/lib/pitrac:${LD_LIBRARY_PATH:-}"
+            export PITRAC_ROOT="/usr/lib/pitrac"
+            export PITRAC_BASE_IMAGE_LOGGING_DIR="${HOME}/LM_Shares/Images/"
+            setup_camera_env
+            # Skip "calibrate" and "camera1", pass only additional args
+            shift 2
+            /usr/lib/pitrac/pitrac_lm --system_mode=camera1Calibrate "$@"
+            ;;
+        camera2)
+            echo "Running Camera 2 calibration..."
+            export LD_LIBRARY_PATH="/usr/lib/pitrac:${LD_LIBRARY_PATH:-}"
+            export PITRAC_ROOT="/usr/lib/pitrac"
+            export PITRAC_BASE_IMAGE_LOGGING_DIR="${HOME}/LM_Shares/Images/"
+            setup_camera_env
+            shift 2
+            /usr/lib/pitrac/pitrac_lm --system_mode=camera2Calibrate "$@"
+            ;;
+        auto1)
+            echo "Running Camera 1 auto-calibration..."
+            export LD_LIBRARY_PATH="/usr/lib/pitrac:${LD_LIBRARY_PATH:-}"
+            export PITRAC_ROOT="/usr/lib/pitrac"
+            export PITRAC_BASE_IMAGE_LOGGING_DIR="${HOME}/LM_Shares/Images/"
+            setup_camera_env
+            shift 2
+            /usr/lib/pitrac/pitrac_lm --system_mode=camera1AutoCalibrate "$@"
+            ;;
+        auto2)
+            echo "Running Camera 2 auto-calibration..."
+            export LD_LIBRARY_PATH="/usr/lib/pitrac:${LD_LIBRARY_PATH:-}"
+            export PITRAC_ROOT="/usr/lib/pitrac"
+            export PITRAC_BASE_IMAGE_LOGGING_DIR="${HOME}/LM_Shares/Images/"
+            setup_camera_env
+            shift 2
+            /usr/lib/pitrac/pitrac_lm --system_mode=camera2AutoCalibrate "$@"
+            ;;
+        manual|wizard)
+            if [[ -f "/usr/lib/pitrac/calibration-wizard" ]]; then
+                exec /usr/lib/pitrac/calibration-wizard "$@"
+            else
+                echo "Manual calibration wizard not installed"
+                echo "Use 'pitrac calibrate camera1' or 'pitrac calibrate camera2' instead"
+            fi
+            ;;
+        *)
+            echo "Usage: pitrac calibrate {camera1|camera2|auto1|auto2|manual}"
+            echo "  camera1 - Calibrate camera 1"
+            echo "  camera2 - Calibrate camera 2"
+            echo "  auto1   - Auto-calibrate camera 1"
+            echo "  auto2   - Auto-calibrate camera 2"
+            echo "  manual  - Run manual calibration wizard (default)"
+            ;;
+    esac
 }
 
 cmd_test() {
@@ -588,7 +638,7 @@ cmd_test() {
             ;;
         quick)
             echo "Running PiTrac quick test..."
-            echo "This will start PiTrac in test mode and exit"
+            echo "This will test image processing (no camera required)"
             
             # Copy config if not present
             if [[ ! -f "golf_sim_config.json" ]]; then
@@ -606,6 +656,46 @@ cmd_test() {
             export PITRAC_BASE_IMAGE_LOGGING_DIR="${HOME}/LM_Shares/Images/"
             setup_camera_env
             /usr/lib/pitrac/pitrac_lm --system_mode=test "$@"
+            ;;
+        spin)
+            echo "Running spin analysis test..."
+            echo "This tests spin detection algorithms (no camera required)"
+            
+            if [[ ! -f "golf_sim_config.json" ]]; then
+                if [[ -f "/etc/pitrac/golf_sim_config.json" ]]; then
+                    cp /etc/pitrac/golf_sim_config.json .
+                fi
+            fi
+            
+            export LD_LIBRARY_PATH="/usr/lib/pitrac:${LD_LIBRARY_PATH:-}"
+            export PITRAC_ROOT="/usr/lib/pitrac"
+            export PITRAC_BASE_IMAGE_LOGGING_DIR="${HOME}/LM_Shares/Images/"
+            setup_camera_env
+            /usr/lib/pitrac/pitrac_lm --system_mode=test_spin "$@"
+            ;;
+        gspro)
+            echo "Testing GSPro server connection..."
+            
+            export LD_LIBRARY_PATH="/usr/lib/pitrac:${LD_LIBRARY_PATH:-}"
+            export PITRAC_ROOT="/usr/lib/pitrac"
+            setup_camera_env
+            /usr/lib/pitrac/pitrac_lm --system_mode=test_gspro_server "$@"
+            ;;
+        automated)
+            echo "Running automated test suite..."
+            echo "This uses test data files (no camera required)"
+            
+            if [[ ! -f "golf_sim_config.json" ]]; then
+                if [[ -f "/etc/pitrac/golf_sim_config.json" ]]; then
+                    cp /etc/pitrac/golf_sim_config.json .
+                fi
+            fi
+            
+            export LD_LIBRARY_PATH="/usr/lib/pitrac:${LD_LIBRARY_PATH:-}"
+            export PITRAC_ROOT="/usr/lib/pitrac"
+            export PITRAC_BASE_IMAGE_LOGGING_DIR="${HOME}/LM_Shares/Images/"
+            setup_camera_env
+            /usr/lib/pitrac/pitrac_lm --system_mode=automated_testing "$@"
             ;;
         camera1|camera2)
             echo "Running PiTrac ${2} standalone test..."
@@ -628,10 +718,17 @@ cmd_test() {
             /usr/lib/pitrac/pitrac_lm --system_mode="${2}_test_standalone" "$@"
             ;;
         *)
-            echo "Usage: pitrac test [hardware|pulse|quick|camera1|camera2]"
-            echo "  hardware - Test hardware components (default)"
+            echo "Usage: pitrac test [hardware|pulse|quick|spin|gspro|automated|camera1|camera2]"
+            echo ""
+            echo "Tests without cameras (image processing only):"
+            echo "  quick     - Quick test of image processing algorithms (default)"
+            echo "  spin      - Test spin detection algorithms"
+            echo "  gspro     - Test GSPro server connection"
+            echo "  automated - Run automated test suite with test data"
+            echo ""
+            echo "Tests requiring cameras:"
+            echo "  hardware - Test hardware components (cameras, GPIO, broker)"
             echo "  pulse    - Test strobe light pulses (Ctrl+C to stop)"
-            echo "  quick    - Run PiTrac in test mode"
             echo "  camera1  - Test camera 1 standalone"
             echo "  camera2  - Test camera 2 standalone"
             ;;
@@ -697,8 +794,8 @@ Main Commands:
   stop             Stop PiTrac
   status           Check what's running
   setup            First-time setup
-  test             Test cameras and hardware
-  calibrate        Camera calibration
+  test             Run tests (with or without cameras)
+  calibrate        Camera calibration modes
   logs             Show recent logs
   logs -f          Watch logs live
   help             Show this help

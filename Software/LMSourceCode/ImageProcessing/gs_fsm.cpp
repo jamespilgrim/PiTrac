@@ -916,10 +916,24 @@ namespace golf_sim {
 
         GS_LOG_TRACE_MSG(trace, "PerformSystemStartupTasks");
 
-        // Setup the Pi Camera to be internally or externally triggered as appropriate
-        if (!PerformCameraSystemStartup() ) {
-            GS_LOG_MSG(error, "Failed to PerformCameraSystemStartup.");
-            return false;
+        SystemMode mode = GolfSimOptions::GetCommandLineOptions().system_mode_;
+        
+        // Skip camera initialization for test modes that don't need hardware
+        // These modes use test images or simulate functionality without cameras
+        bool skip_camera = (mode == SystemMode::kTest ||
+                           mode == SystemMode::kTestSpin ||
+                           mode == SystemMode::kTestExternalSimMessage ||
+                           mode == SystemMode::kTestGSProServer ||
+                           mode == SystemMode::kAutomatedTesting);
+
+        if (!skip_camera) {
+            // Setup the Pi Camera to be internally or externally triggered as appropriate
+            if (!PerformCameraSystemStartup() ) {
+                GS_LOG_MSG(error, "Failed to PerformCameraSystemStartup.");
+                return false;
+            }
+        } else {
+            GS_LOG_MSG(info, "Skipping camera initialization for test mode: " + std::to_string(mode));
         }
 
         if (!GolfSimIpcSystem::InitializeIPCSystem()) {
