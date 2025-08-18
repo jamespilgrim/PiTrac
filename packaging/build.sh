@@ -45,7 +45,8 @@ show_usage() {
     echo "  $0              # Build PiTrac (deps must exist)"
     echo "  $0 deps         # Build dependency artifacts"
     echo "  $0 all          # Build everything from scratch"
-    echo "  $0 dev          # Build and install on Pi for testing"
+    echo "  $0 dev          # Build and install on Pi (incremental)"
+    echo "  $0 dev force    # Clean build and install on Pi"
     echo "  $0 all true     # Force rebuild everything"
 }
 
@@ -189,8 +190,14 @@ build_dev() {
     # Check for sudo
     if [[ $EUID -ne 0 ]]; then
         log_error "Dev mode requires root privileges to install to system locations"
-        log_info "Please run: sudo $0 dev"
+        log_info "Please run: sudo ./build.sh dev"
         exit 1
+    fi
+    
+    # Check for force rebuild flag
+    if [[ "${2:-}" == "force" ]]; then
+        FORCE_REBUILD="true"
+        log_info "Force rebuild requested - will clean build directory"
     fi
     
     # Check artifacts exist
@@ -265,51 +272,78 @@ build_dev() {
         apt-get install -y "${missing_deps[@]}"
     fi
     
-    # Extract dependencies to system locations
-    log_info "Installing pre-built dependencies to /usr/lib/pitrac..."
+    # Extract dependencies to system locations (skip if already present)
+    log_info "Checking pre-built dependencies..."
     mkdir -p /usr/lib/pitrac
     
-    log_info "  Extracting OpenCV 4.11.0..."
-    tar xzf "$ARTIFACT_DIR/opencv-4.11.0-arm64.tar.gz" -C /tmp/
-    cp -r /tmp/opencv/lib/*.so* /usr/lib/pitrac/ 2>/dev/null || true
-    rm -rf /tmp/opencv
+    # Check and extract OpenCV if needed
+    if [[ ! -f /usr/lib/pitrac/libopencv_core.so.4.11.0 ]]; then
+        log_info "  Extracting OpenCV 4.11.0..."
+        tar xzf "$ARTIFACT_DIR/opencv-4.11.0-arm64.tar.gz" -C /tmp/
+        cp -r /tmp/opencv/lib/*.so* /usr/lib/pitrac/ 2>/dev/null || true
+        rm -rf /tmp/opencv
+    else
+        log_info "  OpenCV 4.11.0 already installed"
+    fi
     
-    log_info "  Extracting ActiveMQ-CPP 3.9.5..."
-    tar xzf "$ARTIFACT_DIR/activemq-cpp-3.9.5-arm64.tar.gz" -C /tmp/
-    cp -r /tmp/activemq-cpp/lib/*.so* /usr/lib/pitrac/ 2>/dev/null || true
-    # Also need headers for building
-    mkdir -p /opt/activemq-cpp
-    cp -r /tmp/activemq-cpp/* /opt/activemq-cpp/
-    rm -rf /tmp/activemq-cpp
+    # Check and extract ActiveMQ if needed
+    if [[ ! -f /usr/lib/pitrac/libactivemq-cpp.so ]]; then
+        log_info "  Extracting ActiveMQ-CPP 3.9.5..."
+        tar xzf "$ARTIFACT_DIR/activemq-cpp-3.9.5-arm64.tar.gz" -C /tmp/
+        cp -r /tmp/activemq-cpp/lib/*.so* /usr/lib/pitrac/ 2>/dev/null || true
+        rm -rf /tmp/activemq-cpp
+    else
+        log_info "  ActiveMQ-CPP 3.9.5 already installed"
+    fi
     
-    log_info "  Extracting lgpio 0.2.2..."
-    tar xzf "$ARTIFACT_DIR/lgpio-0.2.2-arm64.tar.gz" -C /tmp/
-    cp -r /tmp/lgpio/lib/*.so* /usr/lib/pitrac/ 2>/dev/null || true
-    rm -rf /tmp/lgpio
+    # Check and extract ActiveMQ headers for building (always needed)
+    if [[ ! -d /opt/activemq-cpp/include ]]; then
+        log_info "  Setting up ActiveMQ headers..."
+        tar xzf "$ARTIFACT_DIR/activemq-cpp-3.9.5-arm64.tar.gz" -C /tmp/
+        mkdir -p /opt/activemq-cpp
+        cp -r /tmp/activemq-cpp/* /opt/activemq-cpp/
+        rm -rf /tmp/activemq-cpp
+    fi
     
-    log_info "  Extracting msgpack-cxx 6.1.1..."
+    # Check and extract lgpio if needed
+    if [[ ! -f /usr/lib/pitrac/liblgpio.so ]]; then
+        log_info "  Extracting lgpio 0.2.2..."
+        tar xzf "$ARTIFACT_DIR/lgpio-0.2.2-arm64.tar.gz" -C /tmp/
+        cp -r /tmp/lgpio/lib/*.so* /usr/lib/pitrac/ 2>/dev/null || true
+        rm -rf /tmp/lgpio
+    else
+        log_info "  lgpio 0.2.2 already installed"
+    fi
+    
+    # Extract msgpack if it has libraries
+    log_info "  Checking msgpack-cxx 6.1.1..."
     tar xzf "$ARTIFACT_DIR/msgpack-cxx-6.1.1-arm64.tar.gz" -C /tmp/
     if [[ -d /tmp/msgpack/lib ]]; then
         cp -r /tmp/msgpack/lib/*.so* /usr/lib/pitrac/ 2>/dev/null || true
     fi
     rm -rf /tmp/msgpack
     
-    # Extract OpenCV headers for building
-    log_info "  Setting up OpenCV headers..."
-    tar xzf "$ARTIFACT_DIR/opencv-4.11.0-arm64.tar.gz" -C /tmp/
-    mkdir -p /opt/opencv
-    cp -r /tmp/opencv/* /opt/opencv/
-    rm -rf /tmp/opencv
+    # Check and extract OpenCV headers for building (always needed)
+    if [[ ! -d /opt/opencv/include/opencv4 ]]; then
+        log_info "  Setting up OpenCV headers..."
+        tar xzf "$ARTIFACT_DIR/opencv-4.11.0-arm64.tar.gz" -C /tmp/
+        mkdir -p /opt/opencv
+        cp -r /tmp/opencv/* /opt/opencv/
+        rm -rf /tmp/opencv
+    else
+        log_info "  OpenCV headers already installed"
+    fi
     
     # Update library cache
     ldconfig
     
     # Create pkg-config files for libraries that don't have them
-    log_info "Creating pkg-config files..."
     mkdir -p /usr/lib/pkgconfig
     
-    # Create lgpio.pc (the Pi repo package doesn't include one)
-    cat > /usr/lib/pkgconfig/lgpio.pc << 'EOF'
+    # Create lgpio.pc if it doesn't exist
+    if [[ ! -f /usr/lib/pkgconfig/lgpio.pc ]]; then
+        log_info "Creating lgpio.pc pkg-config file..."
+        cat > /usr/lib/pkgconfig/lgpio.pc << 'EOF'
 prefix=/usr
 exec_prefix=${prefix}
 libdir=${exec_prefix}/lib/aarch64-linux-gnu
@@ -321,9 +355,12 @@ Version: 0.2.2
 Libs: -L${libdir} -llgpio
 Cflags: -I${includedir}
 EOF
+    fi
     
-    # Create msgpack-cxx.pc (header-only library)
-    cat > /usr/lib/pkgconfig/msgpack-cxx.pc << 'EOF'
+    # Create msgpack-cxx.pc if it doesn't exist
+    if [[ ! -f /usr/lib/pkgconfig/msgpack-cxx.pc ]]; then
+        log_info "Creating msgpack-cxx.pc pkg-config file..."
+        cat > /usr/lib/pkgconfig/msgpack-cxx.pc << 'EOF'
 prefix=/usr
 exec_prefix=${prefix}
 includedir=${prefix}/include
@@ -333,6 +370,7 @@ Description: MessagePack implementation for C++
 Version: 4.1.3
 Cflags: -I${includedir}
 EOF
+    fi
     
     # Build PiTrac
     log_info "Building PiTrac..."
@@ -356,12 +394,20 @@ EOF
     mkdir -p ClosedSourceObjectFiles
     touch ClosedSourceObjectFiles/gs_e6_response.cpp.o
     
-    # Clean previous build
-    rm -rf build
-    
-    # Build with meson
-    log_info "Configuring build with Meson..."
-    meson setup build --buildtype=release -Denable_recompile_closed_source=false
+    # Determine if we need a clean build
+    if [[ "$FORCE_REBUILD" == "true" ]] || [[ ! -d "build" ]]; then
+        log_info "Performing clean build..."
+        rm -rf build
+        log_info "Configuring build with Meson..."
+        meson setup build --buildtype=release -Denable_recompile_closed_source=false
+    else
+        log_info "Using incremental build (use 'sudo ./build.sh dev force' for clean build)"
+        # Check if build system needs reconfiguration
+        if [[ "meson.build" -nt "build/build.ninja" ]] 2>/dev/null; then
+            log_info "meson.build changed, reconfiguring..."
+            meson setup build --buildtype=release -Denable_recompile_closed_source=false --reconfigure
+        fi
+    fi
     
     log_info "Building with Ninja..."
     ninja -C build pitrac_lm
@@ -486,7 +532,9 @@ EOF
     echo "  pitrac run          # Start tracking (requires cameras)"
     echo "  pitrac help         # Show all commands"
     echo ""
-    echo "To rebuild after code changes, run: sudo $0 dev"
+    echo "To rebuild after code changes:"
+    echo "  sudo ./build.sh dev         # Fast incremental build (only changed files)"
+    echo "  sudo ./build.sh dev force   # Full clean rebuild"
 }
 
 # Main execution
