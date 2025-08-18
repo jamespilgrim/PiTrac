@@ -395,18 +395,20 @@ EOF
     touch ClosedSourceObjectFiles/gs_e6_response.cpp.o
     
     # Determine if we need a clean build
-    if [[ "$FORCE_REBUILD" == "true" ]] || [[ ! -d "build" ]]; then
-        log_info "Performing clean build..."
+    if [[ "$FORCE_REBUILD" == "true" ]]; then
+        log_info "Force rebuild requested - cleaning build directory..."
         rm -rf build
+    fi
+    
+    # Only run meson setup if build directory doesn't exist
+    if [[ ! -d "build" ]]; then
         log_info "Configuring build with Meson..."
         meson setup build --buildtype=release -Denable_recompile_closed_source=false
+    elif [[ "meson.build" -nt "build/build.ninja" ]] 2>/dev/null; then
+        log_warn "meson.build has changed - reconfiguration recommended"
+        log_info "Run 'sudo ./build.sh dev force' to reconfigure the build system"
     else
         log_info "Using incremental build (use 'sudo ./build.sh dev force' for clean build)"
-        # Check if build system needs reconfiguration
-        if [[ "meson.build" -nt "build/build.ninja" ]] 2>/dev/null; then
-            log_info "meson.build changed, reconfiguring..."
-            meson setup build --buildtype=release -Denable_recompile_closed_source=false --reconfigure
-        fi
     fi
     
     log_info "Building with Ninja..."
