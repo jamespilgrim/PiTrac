@@ -1,8 +1,6 @@
 #!/usr/bin/env bash
 # lib/environment.sh - Environment setup functions
 
-source "${BASHLY_SOURCE_DIR}/lib/hardware.sh"
-
 readonly PITRAC_BINARY="/usr/lib/pitrac/pitrac_lm"
 readonly PITRAC_LIB_DIR="/usr/lib/pitrac"
 readonly PITRAC_SHARE_DIR="/usr/share/pitrac"

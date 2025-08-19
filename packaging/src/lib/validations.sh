@@ -52,8 +52,6 @@ validate_camera_slot() {
 }
 
 validate_not_already_running() {
-  source "${BASHLY_SOURCE_DIR}/lib/process.sh"
-  
   if is_pitrac_running; then
     echo "PiTrac is already running (PID: $(get_pitrac_pid))"
   fi
