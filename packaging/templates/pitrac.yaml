@@ -8,6 +8,7 @@ version: 1.0
 system:
   mode: single  # single or dual camera setup
   camera_role: camera1  # camera1 or camera2 (for dual setup)
+  golfer_orientation: right_handed  # right_handed or left_handed
 
 # Camera hardware configuration
 # These are passed as environment variables to the PiTrac binary

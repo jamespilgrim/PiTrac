@@ -14,16 +14,13 @@ if is_pitrac_running; then
   exit 1
 fi
 
-ensure_configuration
 ensure_golf_config
 
 load_configuration
 
 setup_pitrac_environment
 
-mapped_mode=$(map_system_mode "$system_mode")
-
-cmd_args=("--system_mode=$mapped_mode")
+cmd_args=("--system_mode=$system_mode")
 
 if [[ "$verbose" == "1" ]]; then
   cmd_args+=("--logging_level=debug")
@@ -36,18 +33,26 @@ if [[ -n "$config_file" ]] && [[ -f "$config_file" ]]; then
 fi
 
 if [[ "$foreground" == "1" ]]; then
-  info "Starting PiTrac in foreground mode ($mapped_mode)..."
+  info "Starting PiTrac launch monitor (foreground)..."
+  info "Press Ctrl+C to stop"
   exec "$PITRAC_BINARY" "${cmd_args[@]}"
 else
-  info "Starting PiTrac in background mode ($mapped_mode)..."
-  start_pitrac_background "${cmd_args[@]}"
+  info "Starting PiTrac launch monitor (background)..."
+  info "Use 'pitrac status' to check status, 'pitrac logs' to view output"
   
-  # Wait a moment and check if it started
+  ensure_pid_directory
+  ensure_log_directory
+  
+  nohup "$PITRAC_BINARY" "${cmd_args[@]}" > "$PITRAC_LOG_FILE" 2>&1 &
+  local pid=$!
+  echo $pid > "$PITRAC_PID_FILE"
+  
   sleep 2
-  if is_pitrac_running; then
-    success "PiTrac started successfully (PID: $(cat "$PITRAC_PID_FILE"))"
+  if kill -0 $pid 2>/dev/null; then
+    success "PiTrac started successfully (PID: $pid)"
   else
-    error "Failed to start PiTrac. Check logs for details."
+    error "Failed to start PiTrac. Check logs with 'pitrac logs'"
+    rm -f "$PITRAC_PID_FILE"
     exit 1
   fi
 fi

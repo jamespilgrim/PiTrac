@@ -36,6 +36,7 @@ parse_yaml_with_yq() {
   
   config[system_mode]=$(yq eval '.system.mode // "camera1"' "$config_file")
   config[system_camera_role]=$(yq eval '.system.camera_role // "camera1"' "$config_file")
+  config[system_golfer_orientation]=$(yq eval '.system.golfer_orientation // "right_handed"' "$config_file")
   config[hardware_gpio_chip]=$(yq eval '.hardware.gpio_chip // "auto"' "$config_file")
   
   config[network_broker_address]=$(yq eval '.network.broker_address // ""' "$config_file")
@@ -154,6 +155,7 @@ parse_yaml_basic() {
   
   config[system_mode]=$(parse_yaml_value "system" "mode" "camera1")
   config[system_camera_role]=$(parse_yaml_value "system" "camera_role" "camera1")
+  config[system_golfer_orientation]=$(parse_yaml_value "system" "golfer_orientation" "right_handed")
   config[hardware_gpio_chip]=$(parse_yaml_value "hardware" "gpio_chip" "auto")
   config[network_broker_address]=$(parse_yaml_value "network" "broker_address" "")
   config[network_broker_port]=$(parse_yaml_value "network" "broker_port" "61616")
@@ -205,6 +207,9 @@ build_pitrac_arguments() {
   local -n args_ref=$1
   
   args_ref=("--system_mode=$(get_system_mode)")
+  
+  [[ -n "${config[system_golfer_orientation]}" ]] && \
+    args_ref+=("--golfer_orientation=${config[system_golfer_orientation]}")
   
   if [[ -n "${config[network_broker_address]}" ]]; then
     local broker="${config[network_broker_address]}"

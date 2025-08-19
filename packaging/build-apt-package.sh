@@ -125,17 +125,12 @@ create_cli_wrapper() {
         fi
     fi
     
-    # Use the Bashly-generated script
-    if [[ -f "$SCRIPT_DIR/pitrac" ]]; then
-        log_info "Using Bashly-generated CLI"
-        cp "$SCRIPT_DIR/pitrac" "$BUILD_DIR/pitrac-cli"
-    elif [[ -f "$SCRIPT_DIR/templates/pitrac-cli.sh" ]]; then
-        log_warn "Falling back to old CLI template"
-        cp "$SCRIPT_DIR/templates/pitrac-cli.sh" "$BUILD_DIR/pitrac-cli"
-    else
-        log_error "No CLI script found!"
+    if [[ ! -f "$SCRIPT_DIR/pitrac" ]]; then
+        log_error "Bashly CLI not found! Run ./generate.sh first"
         exit 1
     fi
+    log_info "Using Bashly-generated CLI"
+    cp "$SCRIPT_DIR/pitrac" "$BUILD_DIR/pitrac-cli"
     
     chmod 755 "$BUILD_DIR/pitrac-cli"
     log_success "CLI wrapper created"

@@ -424,9 +424,12 @@ EOF
     log_info "Installing PiTrac binary..."
     install -m 755 build/pitrac_lm /usr/lib/pitrac/pitrac_lm
     
-    # Install CLI tool
     log_info "Installing CLI tool..."
-    install -m 755 "$SCRIPT_DIR/templates/pitrac-cli.sh" /usr/bin/pitrac
+    if [[ ! -f "$SCRIPT_DIR/pitrac" ]]; then
+        log_error "Bashly CLI not found! Run ./generate.sh first"
+        exit 1
+    fi
+    install -m 755 "$SCRIPT_DIR/pitrac" /usr/bin/pitrac
     
     # Install camera tools
     log_info "Installing camera tools..."
