@@ -40,6 +40,77 @@ get_gpio_chip() {
     fi
 }
 
+setup_pitrac_env() {
+    export LD_LIBRARY_PATH="/usr/lib/pitrac:${LD_LIBRARY_PATH:-}"
+    export PITRAC_ROOT="/usr/lib/pitrac"
+    setup_camera_env
+}
+
+ensure_golf_config() {
+    if [[ ! -f "golf_sim_config.json" ]]; then
+        if [[ -f "/etc/pitrac/golf_sim_config.json" ]]; then
+            echo "Copying config file to current directory..."
+            cp /etc/pitrac/golf_sim_config.json .
+            sed -i "s|~/|${HOME}/|g" golf_sim_config.json
+        else
+            echo "ERROR: Config file not found at /etc/pitrac/golf_sim_config.json"
+            return 1
+        fi
+    fi
+    return 0
+}
+
+parse_yaml_value() {
+    local section="$1"
+    local key="$2"
+    local lines_after="${3:-1}"
+    local value=""
+    
+    if [[ -f "$CONFIG_FILE" ]]; then
+        value=$(grep -A${lines_after} "^${section}:" "$CONFIG_FILE" | \
+                grep "${key}:" | \
+                grep -v "^[[:space:]]*#" | \
+                sed "s/.*${key}: *//" | \
+                sed 's/#.*//' | \
+                tr -d ' "' || true)
+    fi
+    echo "$value"
+}
+
+get_system_mode() {
+    local system_mode="camera1"
+    if [[ -f "$CONFIG_FILE" ]]; then
+        local mode=$(parse_yaml_value "system" "mode" 1)
+        local role=$(parse_yaml_value "system" "camera_role" 2)
+        if [[ "$mode" == "dual" && "$role" == "camera2" ]]; then
+            system_mode="camera2"
+        fi
+    fi
+    echo "$system_mode"
+}
+
+build_pitrac_args() {
+    local -n args_ref=$1
+    local system_mode=$(get_system_mode)
+    
+    args_ref=("--system_mode=$system_mode")
+    
+    local broker_address=$(parse_yaml_value "network" "broker_address" 1)
+    local image_logging_dir=$(parse_yaml_value "storage" "image_logging_dir" 2)
+    local web_share_dir=$(parse_yaml_value "storage" "web_share_dir" 2)
+    local e6_host=$(parse_yaml_value "simulators" "e6_host" 2)
+    local gspro_host=$(parse_yaml_value "simulators" "gspro_host" 2)
+    
+    image_logging_dir="${image_logging_dir//\~/$HOME}"
+    web_share_dir="${web_share_dir//\~/$HOME}"
+    
+    [[ -n "$broker_address" ]] && args_ref+=("--msg_broker_address=$broker_address")
+    [[ -n "$image_logging_dir" ]] && args_ref+=("--base_image_logging_dir=$image_logging_dir")
+    [[ -n "$web_share_dir" ]] && args_ref+=("--web_server_share_dir=$web_share_dir")
+    [[ -n "$e6_host" ]] && args_ref+=("--e6_host_address=$e6_host")
+    [[ -n "$gspro_host" ]] && args_ref+=("--gspro_host_address=$gspro_host")
+}
+
 setup_camera_env() {
     # Read camera and lens types from pitrac.yaml config
     # Defaults: Camera type 4 (Pi GS), Lens type 1 (6mm)
@@ -68,26 +139,10 @@ setup_camera_env() {
 
 cmd_run() {
     echo "Setting environment variables..."
+    setup_pitrac_env
     
-    export PITRAC_ROOT="/usr/lib/pitrac"
-    export PITRAC_BASE_IMAGE_LOGGING_DIR="${HOME}/LM_Shares/Images/"
-    export PITRAC_WEBSERVER_SHARE_DIR="${HOME}/LM_Shares/WebShare/"
-    export PITRAC_MSG_BROKER_FULL_ADDRESS="tcp://localhost:61616"
-    
-    # Set up camera environment variables from config
-    setup_camera_env
-    
-    # Check if golf_sim_config.json exists in current directory
-    if [[ ! -f "golf_sim_config.json" ]]; then
-        echo "Creating golf_sim_config.json from template..."
-        if [[ -f "/etc/pitrac/golf_sim_config.json" ]]; then
-            cp /etc/pitrac/golf_sim_config.json .
-            # Update paths for current user
-            sed -i "s|~/|${HOME}/|g" golf_sim_config.json
-        else
-            echo "ERROR: Template config not found at /etc/pitrac/golf_sim_config.json"
-            exit 1
-        fi
+    if ! ensure_golf_config; then
+        exit 1
     fi
     
     # Set libcamera config based on Pi model
@@ -137,37 +192,17 @@ cmd_run() {
                 args+=("$arg")
             fi
         done
-        # If no arguments provided, determine system mode from config
         if [[ ${#args[@]} -eq 0 ]]; then
-            # Check config for system mode
-            local system_mode="camera1"  # default
-            if [[ -f "$CONFIG_FILE" ]]; then
-                local mode=$(grep -A1 "^system:" "$CONFIG_FILE" | grep "mode:" | awk '{print $2}')
-                local role=$(grep -A2 "^system:" "$CONFIG_FILE" | grep "camera_role:" | awk '{print $2}')
-                if [[ "$mode" == "dual" && "$role" == "camera2" ]]; then
-                    system_mode="camera2"
-                fi
-            fi
-            args=("--system_mode=$system_mode")
+            build_pitrac_args args
         fi
         exec "$BINARY_PATH" "${args[@]}"
     else
         echo "Starting PiTrac launch monitor (background)..."
         echo "Use 'pitrac status' to check status, 'pitrac logs' to view output"
         export LD_LIBRARY_PATH="/usr/lib/pitrac:${LD_LIBRARY_PATH:-}"
-        # If no arguments provided, determine system mode from config
         local run_args=("$@")
         if [[ ${#run_args[@]} -eq 0 ]]; then
-            # Check config for system mode
-            local system_mode="camera1"  # default
-            if [[ -f "$CONFIG_FILE" ]]; then
-                local mode=$(grep -A1 "^system:" "$CONFIG_FILE" | grep "mode:" | awk '{print $2}')
-                local role=$(grep -A2 "^system:" "$CONFIG_FILE" | grep "camera_role:" | awk '{print $2}')
-                if [[ "$mode" == "dual" && "$role" == "camera2" ]]; then
-                    system_mode="camera2"
-                fi
-            fi
-            run_args=("--system_mode=$system_mode")
+            build_pitrac_args run_args
         fi
         nohup "$BINARY_PATH" "${run_args[@]}" > /tmp/pitrac.log 2>&1 &
         local pid=$!
@@ -262,10 +297,30 @@ cmd_config() {
         edit)
             ${EDITOR:-nano} "$CONFIG_FILE"
             echo ""
-            echo "Note: For network, storage, and simulator settings, edit golf_sim_config.json"
+            echo "Note: Settings in this file override defaults in golf_sim_config.json when uncommented"
             ;;
         show)
             cat "$CONFIG_FILE"
+            echo ""
+            echo "Active overrides (uncommented settings):"
+            local has_overrides=false
+            
+            local broker=$(parse_yaml_value "network" "broker_address" 1)
+            [[ -n "$broker" ]] && echo "  Broker: $broker (overrides golf_sim_config.json)" && has_overrides=true
+            
+            local img_dir=$(parse_yaml_value "storage" "image_logging_dir" 2)
+            [[ -n "$img_dir" ]] && echo "  Image dir: $img_dir (overrides golf_sim_config.json)" && has_overrides=true
+            
+            local web_dir=$(parse_yaml_value "storage" "web_share_dir" 2)
+            [[ -n "$web_dir" ]] && echo "  Web dir: $web_dir (overrides golf_sim_config.json)" && has_overrides=true
+            
+            local e6=$(parse_yaml_value "simulators" "e6_host" 2)
+            [[ -n "$e6" ]] && echo "  E6 host: $e6 (overrides golf_sim_config.json)" && has_overrides=true
+            
+            local gspro=$(parse_yaml_value "simulators" "gspro_host" 2)
+            [[ -n "$gspro" ]] && echo "  GSPro host: $gspro (overrides golf_sim_config.json)" && has_overrides=true
+            
+            [[ "$has_overrides" == "false" ]] && echo "  None - using all defaults from golf_sim_config.json"
             ;;
         cameras)
             echo "Camera Configuration:"
@@ -321,11 +376,16 @@ cmd_config() {
         *)
             echo "Usage: pitrac config {edit|show|cameras|validate|reset}"
             echo ""
-            echo "  edit     - Edit configuration file"
-            echo "  show     - Display current configuration"
+            echo "  edit     - Edit configuration file (system, cameras, optional overrides)"
+            echo "  show     - Display current configuration and active overrides"
             echo "  cameras  - Show camera and lens configuration"
             echo "  validate - Check configuration is valid"
             echo "  reset    - Reset to default configuration"
+            echo ""
+            echo "Configuration priority:"
+            echo "  1. Command-line arguments (highest priority)"
+            echo "  2. pitrac.yaml overrides (when uncommented)"
+            echo "  3. golf_sim_config.json defaults (lowest priority)"
             ;;
     esac
 }
@@ -551,38 +611,26 @@ cmd_calibrate() {
     case "${2:-manual}" in
         camera1)
             echo "Running Camera 1 calibration..."
-            export LD_LIBRARY_PATH="/usr/lib/pitrac:${LD_LIBRARY_PATH:-}"
-            export PITRAC_ROOT="/usr/lib/pitrac"
-            export PITRAC_BASE_IMAGE_LOGGING_DIR="${HOME}/LM_Shares/Images/"
-            setup_camera_env
+            setup_pitrac_env
             # Skip "calibrate" and "camera1", pass only additional args
             shift 2
             /usr/lib/pitrac/pitrac_lm --system_mode=camera1Calibrate "$@"
             ;;
         camera2)
             echo "Running Camera 2 calibration..."
-            export LD_LIBRARY_PATH="/usr/lib/pitrac:${LD_LIBRARY_PATH:-}"
-            export PITRAC_ROOT="/usr/lib/pitrac"
-            export PITRAC_BASE_IMAGE_LOGGING_DIR="${HOME}/LM_Shares/Images/"
-            setup_camera_env
+            setup_pitrac_env
             shift 2
             /usr/lib/pitrac/pitrac_lm --system_mode=camera2Calibrate "$@"
             ;;
         auto1)
             echo "Running Camera 1 auto-calibration..."
-            export LD_LIBRARY_PATH="/usr/lib/pitrac:${LD_LIBRARY_PATH:-}"
-            export PITRAC_ROOT="/usr/lib/pitrac"
-            export PITRAC_BASE_IMAGE_LOGGING_DIR="${HOME}/LM_Shares/Images/"
-            setup_camera_env
+            setup_pitrac_env
             shift 2
             /usr/lib/pitrac/pitrac_lm --system_mode=camera1AutoCalibrate "$@"
             ;;
         auto2)
             echo "Running Camera 2 auto-calibration..."
-            export LD_LIBRARY_PATH="/usr/lib/pitrac:${LD_LIBRARY_PATH:-}"
-            export PITRAC_ROOT="/usr/lib/pitrac"
-            export PITRAC_BASE_IMAGE_LOGGING_DIR="${HOME}/LM_Shares/Images/"
-            setup_camera_env
+            setup_pitrac_env
             shift 2
             /usr/lib/pitrac/pitrac_lm --system_mode=camera2AutoCalibrate "$@"
             ;;
@@ -635,10 +683,7 @@ cmd_test() {
             echo "WARNING: Look at the LED from at least 2 feet away!"
             sleep 2
             
-            export LD_LIBRARY_PATH="/usr/lib/pitrac:${LD_LIBRARY_PATH:-}"
-            export PITRAC_ROOT="/usr/lib/pitrac"
-            export PITRAC_BASE_IMAGE_LOGGING_DIR="${HOME}/LM_Shares/Images/"
-            setup_camera_env
+            setup_pitrac_env
             /usr/lib/pitrac/pitrac_lm --pulse_test --system_mode=camera1 --logging_level=info
             ;;
         quick)
@@ -646,21 +691,11 @@ cmd_test() {
             echo "This will test image processing (no camera required)"
             echo ""
             
-            # Copy config if not present
-            if [[ ! -f "golf_sim_config.json" ]]; then
-                if [[ -f "/etc/pitrac/golf_sim_config.json" ]]; then
-                    echo "Copying config file to current directory..."
-                    cp /etc/pitrac/golf_sim_config.json .
-                else
-                    echo "ERROR: Config file not found. Please copy /etc/pitrac/golf_sim_config.json to current directory"
-                    exit 1
-                fi
+            if ! ensure_golf_config; then
+                exit 1
             fi
             
-            export LD_LIBRARY_PATH="/usr/lib/pitrac:${LD_LIBRARY_PATH:-}"
-            export PITRAC_ROOT="/usr/lib/pitrac"
-            export PITRAC_BASE_IMAGE_LOGGING_DIR="${HOME}/LM_Shares/Images/"
-            setup_camera_env
+            setup_pitrac_env
             
             echo "Processing test images..."
             echo "================================"
@@ -675,16 +710,9 @@ cmd_test() {
             echo "This tests spin detection algorithms (no camera required)"
             echo ""
             
-            if [[ ! -f "golf_sim_config.json" ]]; then
-                if [[ -f "/etc/pitrac/golf_sim_config.json" ]]; then
-                    cp /etc/pitrac/golf_sim_config.json .
-                fi
-            fi
+            ensure_golf_config
             
-            export LD_LIBRARY_PATH="/usr/lib/pitrac:${LD_LIBRARY_PATH:-}"
-            export PITRAC_ROOT="/usr/lib/pitrac"
-            export PITRAC_BASE_IMAGE_LOGGING_DIR="${HOME}/LM_Shares/Images/"
-            setup_camera_env
+            setup_pitrac_env
             
             echo "Processing spin detection..."
             echo "================================"
@@ -696,9 +724,7 @@ cmd_test() {
             echo "Testing GSPro server connection..."
             echo ""
             
-            export LD_LIBRARY_PATH="/usr/lib/pitrac:${LD_LIBRARY_PATH:-}"
-            export PITRAC_ROOT="/usr/lib/pitrac"
-            setup_camera_env
+            setup_pitrac_env
             
             echo "Connecting to GSPro..."
             echo "================================"
@@ -711,16 +737,9 @@ cmd_test() {
             echo "This uses test data files (no camera required)"
             echo ""
             
-            if [[ ! -f "golf_sim_config.json" ]]; then
-                if [[ -f "/etc/pitrac/golf_sim_config.json" ]]; then
-                    cp /etc/pitrac/golf_sim_config.json .
-                fi
-            fi
+            ensure_golf_config
             
-            export LD_LIBRARY_PATH="/usr/lib/pitrac:${LD_LIBRARY_PATH:-}"
-            export PITRAC_ROOT="/usr/lib/pitrac"
-            export PITRAC_BASE_IMAGE_LOGGING_DIR="${HOME}/LM_Shares/Images/"
-            setup_camera_env
+            setup_pitrac_env
             
             echo "Running test suite..."
             echo "================================"
@@ -733,21 +752,11 @@ cmd_test() {
             echo "Note: This test requires ${2} to be connected"
             echo ""
             
-            # Copy config if not present
-            if [[ ! -f "golf_sim_config.json" ]]; then
-                if [[ -f "/etc/pitrac/golf_sim_config.json" ]]; then
-                    echo "Copying config file to current directory..."
-                    cp /etc/pitrac/golf_sim_config.json .
-                else
-                    echo "ERROR: Config file not found. Please copy /etc/pitrac/golf_sim_config.json to current directory"
-                    exit 1
-                fi
+            if ! ensure_golf_config; then
+                exit 1
             fi
             
-            export LD_LIBRARY_PATH="/usr/lib/pitrac:${LD_LIBRARY_PATH:-}"
-            export PITRAC_ROOT="/usr/lib/pitrac"
-            export PITRAC_BASE_IMAGE_LOGGING_DIR="${HOME}/LM_Shares/Images/"
-            setup_camera_env
+            setup_pitrac_env
             
             echo "Testing ${2}..."
             echo "================================"

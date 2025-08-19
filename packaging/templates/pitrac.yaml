@@ -1,6 +1,6 @@
 # PiTrac Configuration
-# This file configures settings that are passed as environment variables to the PiTrac binary.
-# For ball tracking parameters, network settings, and storage paths, edit golf_sim_config.json
+# This file configures system-level settings for PiTrac.
+# Settings here override defaults in golf_sim_config.json when uncommented.
 
 version: 1.0
 
@@ -19,8 +19,21 @@ cameras:
     type: 4  # 1=PiCam1.3, 2=PiCam2, 3=PiHQ, 4=PiGS, 5=InnoMaker
     lens: 1  # 1=6mm, 2=3.6mm_M12 (optional, defaults to 1)
 
-# NOTE: The following settings should be configured in golf_sim_config.json:
-# - Storage paths (kLinuxBaseImageLoggingDir, kWebServerShareDirectory)
-# - Network settings (kWebActiveMQHostAddress)
-# - Simulator interfaces (E6, GSPro settings)
-# - All ball tracking and image processing parameters
+# Network and Storage Configuration (Optional Overrides)
+# Uncomment these to override the defaults in golf_sim_config.json
+# When commented out, PiTrac will use the values from golf_sim_config.json
+network:
+  # broker_address: "tcp://localhost:61616"  # ActiveMQ broker address (default from golf_sim_config.json: kWebActiveMQHostAddress)
+
+storage:
+  # image_logging_dir: "~/LM_Shares/Images/"  # Where PiTrac saves diagnostic images (default from golf_sim_config.json: kLinuxBaseImageLoggingDir)
+  # web_share_dir: "~/LM_Shares/Images/"      # Web server image share directory (default from golf_sim_config.json: kWebServerShareDirectory)
+
+# Simulator Interfaces (Optional Overrides)
+# Uncomment to override golf_sim_config.json settings
+simulators:
+  # e6_host: ""      # E6 simulator host address (empty = disabled)
+  # gspro_host: ""   # GSPro simulator host address (empty = disabled)
+
+# NOTE: Ball tracking parameters and calibration settings remain in golf_sim_config.json
+# These include all image processing, ball identification, spin analysis, and camera calibration parameters
