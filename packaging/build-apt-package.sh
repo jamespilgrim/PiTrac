@@ -111,11 +111,32 @@ extract_pitrac_binary() {
 
 create_cli_wrapper() {
     log_info "Creating CLI wrapper..."
-    if [[ ! -f "$SCRIPT_DIR/templates/pitrac-cli.sh" ]]; then
-        log_error "Template file not found: $SCRIPT_DIR/templates/pitrac-cli.sh"
+    
+    # First, generate the Bashly script if it doesn't exist
+    if [[ ! -f "$SCRIPT_DIR/pitrac" ]]; then
+        log_info "Generating Bashly CLI script..."
+        if [[ -f "$SCRIPT_DIR/generate.sh" ]]; then
+            cd "$SCRIPT_DIR"
+            ./generate.sh
+            cd - > /dev/null
+        else
+            log_error "Cannot generate Bashly script - generate.sh not found"
+            exit 1
+        fi
+    fi
+    
+    # Use the Bashly-generated script
+    if [[ -f "$SCRIPT_DIR/pitrac" ]]; then
+        log_info "Using Bashly-generated CLI"
+        cp "$SCRIPT_DIR/pitrac" "$BUILD_DIR/pitrac-cli"
+    elif [[ -f "$SCRIPT_DIR/templates/pitrac-cli.sh" ]]; then
+        log_warn "Falling back to old CLI template"
+        cp "$SCRIPT_DIR/templates/pitrac-cli.sh" "$BUILD_DIR/pitrac-cli"
+    else
+        log_error "No CLI script found!"
         exit 1
     fi
-    cp "$SCRIPT_DIR/templates/pitrac-cli.sh" "$BUILD_DIR/pitrac-cli"
+    
     chmod 755 "$BUILD_DIR/pitrac-cli"
     log_success "CLI wrapper created"
 }
@@ -137,7 +158,7 @@ install_binaries() {
     # Install main binary
     install -m 755 "$BUILD_DIR/pitrac_lm.tmp" "$DEB_DIR/usr/lib/pitrac/pitrac_lm"
     
-    # Install CLI tool
+    # Install CLI tool (Bashly-generated script is self-contained)
     install -m 755 "$BUILD_DIR/pitrac-cli" "$DEB_DIR/usr/bin/pitrac"
     
     log_success "Binaries installed"
