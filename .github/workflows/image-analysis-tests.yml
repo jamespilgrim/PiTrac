@@ -4,9 +4,15 @@ on:
   push:
     branches:
       - "**"
+    paths:
+      - 'Software/LMSourceCode/ImageProcessing/ImageAnalysis/**'
+      - '.github/workflows/image-analysis-tests.yml'
   pull_request:
     branches:
       - "**"
+    paths:
+      - 'Software/LMSourceCode/ImageProcessing/ImageAnalysis/**'
+      - '.github/workflows/image-analysis-tests.yml'
 env:
   BOOST_VERSION: 1.87.0
   BOOST_ROOT: C:\Dev_Env\boost\boost

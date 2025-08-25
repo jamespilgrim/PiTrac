@@ -4,9 +4,15 @@ on:
   push:
     branches:
       - "**"
+    paths:
+      - 'Software/LMSourceCode/ImageProcessing/Camera/**'
+      - '.github/workflows/camera-tests.yml'
   pull_request:
     branches:
       - "**"
+    paths:
+      - 'Software/LMSourceCode/ImageProcessing/Camera/**'
+      - '.github/workflows/camera-tests.yml'
 env:
   BOOST_VERSION: 1.84.0
   BOOST_MSVC_VERSION: "14.3"

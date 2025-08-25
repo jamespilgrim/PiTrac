@@ -1,12 +1,27 @@
 # Default owner of the ship. Not needed, but just adding. 
 * @jamespilgrim
 
+/Software @jamespilgrim
+
 # Java Ownership files 
-/Software/LMSourceCode/ImageProcessing/golfsim_tomee_webapp @jeshernandez 
+/Software/LMSourceCode/ImageProcessing/golfsim_tomee_webapp @jeshernandez
+
+# Yolo Model + Tooling
+/Software/GroundTruthAnnotator @connorgallopo
+/Software/LMSourceCode/ImageProcessing @jamespilgrim @connorgallopo
 
 # Documentation files
-/docs @jeshernandez
+/docs @jeshernandez @connorgallopo
+/docs/hardware @markjonharman
 
 # Installation Scripts
-
 /Dev @jeshernandez
+
+# Hardware
+/Hardware @markjonharman
+
+# Packaging
+/packaging @connorgallopo
+
+# GitHub Workflows
+.github/workflows @jamespilgrim @connorgallopo
