@@ -8,6 +8,7 @@ on:
     types: [opened, synchronize, reopened, closed]
 
 permissions:
+  actions: write
   contents: read
   pull-requests: write
   statuses: write
@@ -23,13 +24,14 @@ jobs:
     env:
       SIGNATURE_PHRASE: "I have read the CLA Document and I hereby sign the CLA"
       RECHECK_PHRASE: "recheck"
+      PATH_TO-DOCUMENT: "https://gist.github.com/jamespilgrim/e6996a438adc0919ebbe70561efbb600#file-verdant-contributor-license-agreement-md"
 
     steps:
       - name: "CLA Assistant"
         if: >
-          github.event_name == 'pull_request_target' ||
-          github.event.comment.body == 'recheck' ||
-          github.event.comment.body == 'I have read the CLA Document and I hereby sign the CLA'
+          (github.event.comment.body == 'recheck' ||
+          github.event.comment.body == 'I have read the CLA Document and I hereby sign the CLA') ||
+          github.event_name == 'pull_request_target'
         uses: contributor-assistant/github-action@v2.6.1
         env:
           # Built-in token for commenting on the PR and setting statuses in PiTrac
@@ -56,7 +58,7 @@ jobs:
             Thanks for your PR! Before we can review it, please sign our Contributor License Agreement.
 
             **How to sign (right here in this PR):**
-            1. Read the CLA: $pathToCLADocument
+            1. Read the CLA: ${{ env.PATH_TO_DOCUMENT }}
             2. Add a new PR comment with exactly this line (copy & paste):
                ```
                ${{ env.SIGNATURE_PHRASE }}
