@@ -573,6 +573,7 @@ EOF
 
         <transportConnectors>
             <transportConnector name="openwire" uri="tcp://127.0.0.1:61616"/>
+            <transportConnector name="stomp" uri="stomp://127.0.0.1:61613"/>
         </transportConnectors>
 
     </broker>

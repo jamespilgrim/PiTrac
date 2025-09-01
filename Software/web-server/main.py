@@ -71,25 +71,46 @@ class ResultType(Enum):
 
 class ActiveMQListener(stomp.ConnectionListener):
     """Listen for messages from ActiveMQ"""
-    
+
     def __init__(self):
         self.connected = False
-        
+
     def on_error(self, frame):
         logger.error(f'ActiveMQ error: {frame.body}')
-        
+
     def on_message(self, frame):
         """Process incoming message from ActiveMQ"""
         try:
-            data = msgpack.unpackb(frame.body, raw=False)
-            asyncio.create_task(process_shot_data(data))
+            # ActiveMQ sends binary msgpack data
+            # STOMP may decode it as string, we need raw bytes
+            if hasattr(frame, 'body'):
+                if isinstance(frame.body, bytes):
+                    body = frame.body
+                else:
+
+                    try:
+                        body = bytes(frame.body, 'latin-1')
+                    except:
+                        body = bytes([ord(c) if ord(c) < 256 else ord(c) & 0xFF for c in frame.body])
+
+                if len(body) > 10 and body[0] == 0xfd:
+                    msgpack_data = body[10:]
+                else:
+                    msgpack_data = body
+
+                # Unpack msgpack data
+                data = msgpack.unpackb(msgpack_data, raw=False)
+                logger.info(f"Received shot data")
+                asyncio.create_task(process_shot_data(data))
+            else:
+                logger.error("Frame has no body attribute")
         except Exception as e:
             logger.error(f"Error processing message: {e}")
-            
+
     def on_connected(self, frame):
         logger.info("Connected to ActiveMQ")
         self.connected = True
-        
+
     def on_disconnected(self):
         logger.warning("Disconnected from ActiveMQ")
         self.connected = False
@@ -98,7 +119,7 @@ class ActiveMQListener(stomp.ConnectionListener):
 async def process_shot_data(data: Dict):
     """Process shot data and notify clients"""
     global current_shot
-    
+
     if "speed" in data:
         current_shot["speed"] = round(data["speed"], 1)
     if "carry" in data:
@@ -115,12 +136,12 @@ async def process_shot_data(data: Dict):
         current_shot["result_type"] = ResultType(data["result_type"]).name.replace("_", " ").title()
     if "message" in data:
         current_shot["message"] = data["message"]
-    
+
     current_shot["timestamp"] = datetime.now().isoformat()
-    
+
     if "image_paths" in data:
         current_shot["images"] = data["image_paths"]
-    
+
     for client in websocket_clients:
         try:
             await client.send_json(current_shot)
@@ -135,16 +156,23 @@ def setup_activemq():
         if CONFIG_FILE.exists():
             with open(CONFIG_FILE) as f:
                 config = yaml.safe_load(f)
-        
-        broker_host = config.get("network", {}).get("broker_host", "localhost")
-        broker_port = config.get("network", {}).get("broker_port", 61613)  # STOMP port
-        
+
+        broker_address = config.get("network", {}).get("broker_address", "tcp://localhost:61616")
+        if broker_address.startswith("tcp://"):
+            broker_address = broker_address[6:]
+
+        if ":" in broker_address:
+            broker_host = broker_address.split(":")[0]
+        else:
+            broker_host = broker_address
+        broker_port = 61613  # Always use STOMP port
+
         conn = stomp.Connection([(broker_host, broker_port)])
         listener = ActiveMQListener()
         conn.set_listener('', listener)
         conn.connect('admin', 'admin', wait=True)
-        conn.subscribe(destination='/topic/pitrac.shots', id=1, ack='auto')
-        
+        conn.subscribe(destination='/topic/Golf.Sim', id=1, ack='auto')
+
         logger.info(f"Connected to ActiveMQ at {broker_host}:{broker_port}")
         return conn
     except Exception as e:
@@ -179,12 +207,11 @@ async def websocket_endpoint(websocket: WebSocket):
     """WebSocket for live updates"""
     await websocket.accept()
     websocket_clients.append(websocket)
-    
+
     await websocket.send_json(current_shot)
-    
+
     try:
         while True:
-            # In testing, this will raise WebSocketDisconnect when client disconnects
             await websocket.receive_text()
     except (WebSocketDisconnect, Exception):
         if websocket in websocket_clients:
@@ -222,13 +249,13 @@ async def reset_shot():
         "timestamp": None,
         "images": []
     }
-    
+
     for client in websocket_clients:
         try:
             await client.send_json(current_shot)
         except:
             pass
-    
+
     return {"status": "reset"}
 
 
@@ -238,7 +265,7 @@ async def health_check():
     mq_connected = False
     if hasattr(app.state, 'mq_conn') and app.state.mq_conn:
         mq_connected = app.state.mq_conn.is_connected()
-    
+
     return {
         "status": "healthy",
         "activemq_connected": mq_connected,
