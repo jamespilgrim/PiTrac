@@ -35,15 +35,25 @@
                 </button>
             </div>
         </div>
-        
+
         <div class="status-bar">
-            <div class="status-indicator">
-                <div class="status-dot" id="status-dot"></div>
-                <span id="status-text">Connected</span>
+            <div class="status-indicators">
+                <div class="status-indicator">
+                    <div class="status-dot" id="ws-status-dot"></div>
+                    <span id="ws-status-text">WebSocket</span>
+                </div>
+                <div class="status-indicator">
+                    <div class="status-dot" id="mq-status-dot"></div>
+                    <span id="mq-status-text">ActiveMQ</span>
+                </div>
+                <div class="status-indicator">
+                    <div class="status-dot" id="pitrac-status-dot"></div>
+                    <span id="pitrac-status-text">PiTrac</span>
+                </div>
             </div>
             <div id="timestamp">Last update: Never</div>
         </div>
-        
+
         <div class="metrics-grid">
             <div class="metric-card">
                 <div class="metric-header">Ball Speed</div>
@@ -52,7 +62,7 @@
                     <span class="metric-unit">mph</span>
                 </div>
             </div>
-            
+
             <div class="metric-card">
                 <div class="metric-header">Carry Distance</div>
                 <div class="metric-value">
@@ -60,7 +70,7 @@
                     <span class="metric-unit">yds</span>
                 </div>
             </div>
-            
+
             <div class="metric-card">
                 <div class="metric-header">Launch Angle</div>
                 <div class="metric-value">
@@ -68,7 +78,7 @@
                     <span class="metric-unit">°</span>
                 </div>
             </div>
-            
+
             <div class="metric-card">
                 <div class="metric-header">Side Angle</div>
                 <div class="metric-value">
@@ -76,7 +86,7 @@
                     <span class="metric-unit">°</span>
                 </div>
             </div>
-            
+
             <div class="metric-card">
                 <div class="metric-header">Back Spin</div>
                 <div class="metric-value">
@@ -84,7 +94,7 @@
                     <span class="metric-unit">rpm</span>
                 </div>
             </div>
-            
+
             <div class="metric-card">
                 <div class="metric-header">Side Spin</div>
                 <div class="metric-value">
@@ -93,12 +103,12 @@
                 </div>
             </div>
         </div>
-        
+
         <div class="message-section">
             <div class="result-type" id="result_type">{{ shot.result_type }}</div>
             <div class="message" id="message">{{ shot.message }}</div>
         </div>
-        
+
         <div class="image-gallery">
             <h2>Shot Images</h2>
             <div class="image-grid" id="image-grid">
@@ -107,13 +117,13 @@
                 {% endfor %}
             </div>
         </div>
-        
+
         <div class="controls">
             <button class="btn btn-primary" onclick="resetShot()">Reset</button>
             <button class="btn btn-secondary" onclick="location.reload()">Refresh</button>
         </div>
     </div>
-    
+
     <script src="/static/dashboard.js"></script>
 </body>
 </html>

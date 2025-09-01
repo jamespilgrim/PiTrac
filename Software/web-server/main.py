@@ -8,6 +8,7 @@ import asyncio
 import json
 import logging
 import os
+import subprocess
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, Optional, List
@@ -87,7 +88,6 @@ class ActiveMQListener(stomp.ConnectionListener):
                 if isinstance(frame.body, bytes):
                     body = frame.body
                 else:
-
                     try:
                         body = bytes(frame.body, 'latin-1')
                     except:
@@ -159,7 +159,7 @@ def setup_activemq():
 
         broker_address = config.get("network", {}).get("broker_address", "tcp://localhost:61616")
         if broker_address.startswith("tcp://"):
-            broker_address = broker_address[6:]
+            broker_address = broker_address[6:]  # Remove tcp:// prefix
 
         if ":" in broker_address:
             broker_host = broker_address.split(":")[0]
@@ -212,6 +212,7 @@ async def websocket_endpoint(websocket: WebSocket):
 
     try:
         while True:
+            # In testing, this will raise WebSocketDisconnect when client disconnects
             await websocket.receive_text()
     except (WebSocketDisconnect, Exception):
         if websocket in websocket_clients:
@@ -266,9 +267,27 @@ async def health_check():
     if hasattr(app.state, 'mq_conn') and app.state.mq_conn:
         mq_connected = app.state.mq_conn.is_connected()
 
+    pitrac_running = False
+    try:
+        result = subprocess.run(["pgrep", "-f", "golf_sim"],
+                              capture_output=True, text=True, timeout=1)
+        pitrac_running = result.returncode == 0
+    except:
+        pass
+
+    activemq_running = False
+    try:
+        result = subprocess.run(["ss", "-tln"],
+                              capture_output=True, text=True, timeout=1)
+        activemq_running = ":61616" in result.stdout or ":61613" in result.stdout
+    except:
+        pass
+
     return {
         "status": "healthy",
         "activemq_connected": mq_connected,
+        "activemq_running": activemq_running,
+        "pitrac_running": pitrac_running,
         "websocket_clients": len(websocket_clients)
     }
 
