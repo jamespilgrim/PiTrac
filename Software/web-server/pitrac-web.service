@@ -1,0 +1,17 @@
+[Unit]
+Description=PiTrac Web Server
+After=network.target activemq.service
+Wants=activemq.service
+
+[Service]
+Type=simple
+User=pi
+Group=pi
+WorkingDirectory=/usr/lib/pitrac/web-server
+Environment="PATH=/usr/bin:/usr/local/bin"
+ExecStart=/usr/bin/python3 /usr/lib/pitrac/web-server/main.py
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

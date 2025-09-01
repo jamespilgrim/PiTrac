@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PiTrac Launch Monitor</title>
+    <link rel="icon" type="image/x-icon" href="/static/favicon.ico">
+    <link rel="stylesheet" href="/static/dashboard.css">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="header-content">
+                <img src="/static/logos/PiTrac.svg" alt="PiTrac Logo" class="header-logo">
+                <h1>Launch Monitor</h1>
+            </div>
+            <div class="theme-toggle">
+                <button class="theme-btn" data-theme="light" title="Light mode" onclick="setTheme('light')">
+                    <svg fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M10 2a1 1 0 011 1v1a1 1 0 11-2 0V3a1 1 0 011-1zm4 8a4 4 0 11-8 0 4 4 0 018 0zm-.464 4.95l.707.707a1 1 0 001.414-1.414l-.707-.707a1 1 0 00-1.414 1.414zm2.12-10.607a1 1 0 010 1.414l-.706.707a1 1 0 11-1.414-1.414l.707-.707a1 1 0 011.414 0zM17 11a1 1 0 100-2h-1a1 1 0 100 2h1zm-7 4a1 1 0 011 1v1a1 1 0 11-2 0v-1a1 1 0 011-1zM5.05 6.464A1 1 0 106.465 5.05l-.708-.707a1 1 0 00-1.414 1.414l.707.707zm1.414 8.486l-.707.707a1 1 0 01-1.414-1.414l.707-.707a1 1 0 011.414 1.414zM4 11a1 1 0 100-2H3a1 1 0 000 2h1z" clip-rule="evenodd"/>
+                    </svg>
+                </button>
+                <button class="theme-btn" data-theme="system" title="System theme" onclick="setTheme('system')">
+                    <svg fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M3 5a2 2 0 012-2h10a2 2 0 012 2v8a2 2 0 01-2 2h-2.22l.123.489.804.804A1 1 0 0113 18H7a1 1 0 01-.707-1.707l.804-.804L7.22 15H5a2 2 0 01-2-2V5zm5.771 7H5V5h10v7H8.771z" clip-rule="evenodd"/>
+                    </svg>
+                </button>
+                <button class="theme-btn" data-theme="dark" title="Dark mode" onclick="setTheme('dark')">
+                    <svg fill="currentColor" viewBox="0 0 20 20">
+                        <path d="M17.293 13.293A8 8 0 016.707 2.707a8.001 8.001 0 1010.586 10.586z"/>
+                    </svg>
+                </button>
+            </div>
+        </div>
+        
+        <div class="status-bar">
+            <div class="status-indicator">
+                <div class="status-dot" id="status-dot"></div>
+                <span id="status-text">Connected</span>
+            </div>
+            <div id="timestamp">Last update: Never</div>
+        </div>
+        
+        <div class="metrics-grid">
+            <div class="metric-card">
+                <div class="metric-header">Ball Speed</div>
+                <div class="metric-value">
+                    <span id="speed">{{ shot.speed }}</span>
+                    <span class="metric-unit">mph</span>
+                </div>
+            </div>
+            
+            <div class="metric-card">
+                <div class="metric-header">Carry Distance</div>
+                <div class="metric-value">
+                    <span id="carry">{{ shot.carry }}</span>
+                    <span class="metric-unit">yds</span>
+                </div>
+            </div>
+            
+            <div class="metric-card">
+                <div class="metric-header">Launch Angle</div>
+                <div class="metric-value">
+                    <span id="launch_angle">{{ shot.launch_angle }}</span>
+                    <span class="metric-unit">°</span>
+                </div>
+            </div>
+            
+            <div class="metric-card">
+                <div class="metric-header">Side Angle</div>
+                <div class="metric-value">
+                    <span id="side_angle">{{ shot.side_angle }}</span>
+                    <span class="metric-unit">°</span>
+                </div>
+            </div>
+            
+            <div class="metric-card">
+                <div class="metric-header">Back Spin</div>
+                <div class="metric-value">
+                    <span id="back_spin">{{ shot.back_spin }}</span>
+                    <span class="metric-unit">rpm</span>
+                </div>
+            </div>
+            
+            <div class="metric-card">
+                <div class="metric-header">Side Spin</div>
+                <div class="metric-value">
+                    <span id="side_spin">{{ shot.side_spin }}</span>
+                    <span class="metric-unit">rpm</span>
+                </div>
+            </div>
+        </div>
+        
+        <div class="message-section">
+            <div class="result-type" id="result_type">{{ shot.result_type }}</div>
+            <div class="message" id="message">{{ shot.message }}</div>
+        </div>
+        
+        <div class="image-gallery">
+            <h2>Shot Images</h2>
+            <div class="image-grid" id="image-grid">
+                {% for image in shot.images %}
+                <img src="/images/{{ image }}" alt="Shot {{ loop.index }}" class="shot-image" loading="lazy">
+                {% endfor %}
+            </div>
+        </div>
+        
+        <div class="controls">
+            <button class="btn btn-primary" onclick="resetShot()">Reset</button>
+            <button class="btn btn-secondary" onclick="location.reload()">Refresh</button>
+        </div>
+    </div>
+    
+    <script src="/static/dashboard.js"></script>
+</body>
+</html>

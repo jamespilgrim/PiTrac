@@ -579,25 +579,35 @@ EOF
     # Install systemd services (optional)
     log_info "Installing systemd services..."
     cp "$SCRIPT_DIR/templates/pitrac.service" /etc/systemd/system/pitrac.service
-    cp "$SCRIPT_DIR/templates/tomee.service" /etc/systemd/system/tomee.service
-    cp "$SCRIPT_DIR/templates/tomee-wrapper.sh" /usr/lib/pitrac/tomee-wrapper.sh
-    chmod 755 /usr/lib/pitrac/tomee-wrapper.sh
     
-    # Install TomEE if artifact exists
-    if [[ -f "$ARTIFACT_DIR/tomee-10.1.0-plume-arm64.tar.gz" ]]; then
-        log_info "Installing TomEE..."
-        tar xzf "$ARTIFACT_DIR/tomee-10.1.0-plume-arm64.tar.gz" -C /opt/
+    # Install Python web server
+    log_info "Installing PiTrac web server..."
+    WEB_SERVER_DIR="$REPO_ROOT/Software/web-server"
+    if [[ -d "$WEB_SERVER_DIR" ]]; then
+        mkdir -p /usr/lib/pitrac/web-server
+        
+        cp -r "$WEB_SERVER_DIR"/* /usr/lib/pitrac/web-server/
+        
+        log_info "Installing Python dependencies for web server..."
+        pip3 install -r /usr/lib/pitrac/web-server/requirements.txt --break-system-packages 2>/dev/null || \
+        pip3 install -r /usr/lib/pitrac/web-server/requirements.txt
+        
+        if [[ -f /usr/lib/pitrac/web-server/pitrac-web.service ]]; then
+            cp /usr/lib/pitrac/web-server/pitrac-web.service /etc/systemd/system/
+        fi
+        
+        log_success "Web server installed"
     else
-        log_warn "TomEE artifact not found, skipping"
-    fi
-    
-    # Install webapp if exists
-    if [[ -f "$ARTIFACT_DIR/golfsim-1.0.0-noarch.war" ]]; then
-        log_info "Installing web application..."
-        mkdir -p /usr/share/pitrac/webapp
-        cp "$ARTIFACT_DIR/golfsim-1.0.0-noarch.war" /usr/share/pitrac/webapp/golfsim.war
-    else
-        log_warn "Web application not found, skipping"
+        log_warn "Web server source not found at $WEB_SERVER_DIR"
+        
+        # Fallback to old TomEE if web server not available
+        if [[ -f "$ARTIFACT_DIR/tomee-10.1.0-plume-arm64.tar.gz" ]]; then
+            log_info "Falling back to TomEE installation..."
+            tar xzf "$ARTIFACT_DIR/tomee-10.1.0-plume-arm64.tar.gz" -C /opt/
+            cp "$SCRIPT_DIR/templates/tomee.service" /etc/systemd/system/tomee.service
+            cp "$SCRIPT_DIR/templates/tomee-wrapper.sh" /usr/lib/pitrac/tomee-wrapper.sh
+            chmod 755 /usr/lib/pitrac/tomee-wrapper.sh
+        fi
     fi
     
     # Create default directories

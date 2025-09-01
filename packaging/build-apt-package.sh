@@ -244,8 +244,20 @@ bundle_dependencies() {
     fi
     rm -rf /tmp/msgpack
     
-    log_info "  TomEE 10.1.0 Plume..."
-    tar xzf "$POC_DIR/deps-artifacts/tomee-10.1.0-plume-arm64.tar.gz" -C "$DEB_DIR/opt/"
+    # Install Python web server instead of TomEE
+    log_info "  PiTrac Web Server..."
+    WEB_SERVER_DIR="$REPO_ROOT/Software/web-server"
+    if [[ -d "$WEB_SERVER_DIR" ]]; then
+        mkdir -p "$DEB_DIR/usr/lib/pitrac/web-server"
+        cp -r "$WEB_SERVER_DIR"/* "$DEB_DIR/usr/lib/pitrac/web-server/"
+        log_info "    Web server files copied"
+    else
+        # Fallback to TomEE if web server not available
+        log_warn "  Web server not found, falling back to TomEE..."
+        if [[ -f "$POC_DIR/deps-artifacts/tomee-10.1.0-plume-arm64.tar.gz" ]]; then
+            tar xzf "$POC_DIR/deps-artifacts/tomee-10.1.0-plume-arm64.tar.gz" -C "$DEB_DIR/opt/"
+        fi
+    fi
     
     strip --strip-unneeded "$lib_dir"/*.so* 2>/dev/null || true
     
@@ -273,11 +285,18 @@ create_configs() {
     fi
 
     cp "$SCRIPT_DIR/templates/pitrac.service" "$DEB_DIR/etc/systemd/system/pitrac.service"
-    cp "$SCRIPT_DIR/templates/tomee.service" "$DEB_DIR/etc/systemd/system/tomee.service"
     
-    # Install tomee wrapper script
-    cp "$SCRIPT_DIR/templates/tomee-wrapper.sh" "$DEB_DIR/usr/lib/pitrac/tomee-wrapper.sh"
-    chmod 755 "$DEB_DIR/usr/lib/pitrac/tomee-wrapper.sh"
+    # Install web server service
+    if [[ -f "$DEB_DIR/usr/lib/pitrac/web-server/pitrac-web.service" ]]; then
+        cp "$DEB_DIR/usr/lib/pitrac/web-server/pitrac-web.service" "$DEB_DIR/etc/systemd/system/"
+    else
+        # Fallback to TomEE service if web server not available
+        if [[ -f "$SCRIPT_DIR/templates/tomee.service" ]]; then
+            cp "$SCRIPT_DIR/templates/tomee.service" "$DEB_DIR/etc/systemd/system/tomee.service"
+            cp "$SCRIPT_DIR/templates/tomee-wrapper.sh" "$DEB_DIR/usr/lib/pitrac/tomee-wrapper.sh"
+            chmod 755 "$DEB_DIR/usr/lib/pitrac/tomee-wrapper.sh"
+        fi
+    fi
 
     log_success "Configs created"
 }

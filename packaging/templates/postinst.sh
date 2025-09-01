@@ -20,12 +20,14 @@ case "$1" in
         PI_MODEL=$(detect_pi_model)
         echo "Detected Pi model: $PI_MODEL"
         
-        # Create tomee user/group
-        if ! getent group tomee >/dev/null; then
-            groupadd -r tomee
-        fi
-        if ! getent passwd tomee >/dev/null; then
-            useradd -r -g tomee -d /opt/tomee -s /bin/false tomee
+        # Create tomee user/group (only if TomEE is installed)
+        if [ -d /opt/tomee ]; then
+            if ! getent group tomee >/dev/null; then
+                groupadd -r tomee
+            fi
+            if ! getent passwd tomee >/dev/null; then
+                useradd -r -g tomee -d /opt/tomee -s /bin/false tomee
+            fi
         fi
         
         # Get the actual user who invoked sudo (if any)
@@ -61,9 +63,18 @@ case "$1" in
             chmod 644 /etc/pitrac/golf_sim_config.json
         fi
         
-        # Set TomEE permissions
-        chown -R tomee:tomee /opt/tomee
-        chmod 755 /opt/tomee/bin/*.sh
+        # Set TomEE permissions (only if installed)
+        if [ -d /opt/tomee ]; then
+            chown -R tomee:tomee /opt/tomee
+            chmod 755 /opt/tomee/bin/*.sh
+        fi
+        
+        # Install Python web server dependencies
+        if [ -d /usr/lib/pitrac/web-server ]; then
+            echo "Installing Python web server dependencies..."
+            pip3 install -r /usr/lib/pitrac/web-server/requirements.txt --break-system-packages 2>/dev/null || \
+            pip3 install -r /usr/lib/pitrac/web-server/requirements.txt || true
+        fi
         
         # Apply Boost C++20 fix
         if [ -f /usr/include/boost/asio/awaitable.hpp ] && ! grep -q "#include <utility>" /usr/include/boost/asio/awaitable.hpp; then
@@ -150,7 +161,13 @@ case "$1" in
         
         # Enable services (but don't start)
         systemctl enable pitrac.service || true
-        systemctl enable tomee.service || true
+        
+        # Enable web server or TomEE
+        if [ -f /etc/systemd/system/pitrac-web.service ]; then
+            systemctl enable pitrac-web.service || true
+        elif [ -f /etc/systemd/system/tomee.service ]; then
+            systemctl enable tomee.service || true
+        fi
         
         echo ""
         echo "======================================"

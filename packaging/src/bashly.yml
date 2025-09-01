@@ -345,8 +345,20 @@ commands:
       - pitrac service enable
 
   # External service management
+  - name: web
+    help: Manage PiTrac web server
+    args:
+      - name: action
+        help: Action to perform
+        required: true
+        allowed: [start, stop, restart, status, logs, url]
+    flags:
+      - long: --follow
+        short: -f
+        help: Follow logs (with 'logs' action)
+
   - name: tomee
-    help: Manage TomEE web server
+    help: "[DEPRECATED] Use 'pitrac web' instead"
     args:
       - name: action
         help: Action to perform

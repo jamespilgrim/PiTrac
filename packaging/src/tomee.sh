@@ -1,7 +1,19 @@
 
+# Show deprecation warning
+warn "The 'tomee' command is deprecated. Please use 'pitrac web' instead."
+echo ""
+
 action="${args[action]}"
 follow="${args[--follow]:-}"
 
+# For deploy action, just show a message since it's not needed with the new server
+if [[ "$action" == "deploy" ]]; then
+  info "Deploy is not needed with the new web server"
+  info "The web server auto-reloads in development mode"
+  exit 0
+fi
+
+# Redirect to web command functionality
 case "$action" in
   start)
     info "Starting TomEE web server..."
