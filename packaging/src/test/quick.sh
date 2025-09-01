@@ -11,6 +11,6 @@ setup_pitrac_environment
 
 echo "Processing test images..."
 echo "================================"
-"$PITRAC_BINARY" --system_mode=test --logging_level=info "$@"
+"$PITRAC_BINARY" --system_mode=test --send_test_results=1 --logging_level=info "$@"
 echo "================================"
 echo "Test complete. Check output for ball detection results."

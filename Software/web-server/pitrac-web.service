@@ -5,8 +5,7 @@ Wants=activemq.service
 
 [Service]
 Type=simple
-User=pi
-Group=pi
+DynamicUser=yes
 WorkingDirectory=/usr/lib/pitrac/web-server
 Environment="PATH=/usr/bin:/usr/local/bin"
 ExecStart=/usr/bin/python3 /usr/lib/pitrac/web-server/main.py

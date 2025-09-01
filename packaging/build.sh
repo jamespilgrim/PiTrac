@@ -283,7 +283,7 @@ build_dev() {
     done
 
     # Python runtime dependencies for CLI tool
-    for pkg in python3 python3-yaml python3-opencv python3-numpy; do
+    for pkg in python3 python3-pip python3-yaml python3-opencv python3-numpy; do
         if ! dpkg -l | grep -q "^ii  $pkg"; then
             missing_deps+=("$pkg")
         fi
@@ -630,23 +630,36 @@ EOF
     # Install systemd services (optional)
     log_info "Installing systemd services..."
     cp "$SCRIPT_DIR/templates/pitrac.service" /etc/systemd/system/pitrac.service
-    
+
     # Install Python web server
     log_info "Installing PiTrac web server..."
     WEB_SERVER_DIR="$REPO_ROOT/Software/web-server"
     if [[ -d "$WEB_SERVER_DIR" ]]; then
         mkdir -p /usr/lib/pitrac/web-server
-        
+
         cp -r "$WEB_SERVER_DIR"/* /usr/lib/pitrac/web-server/
-        
+
         log_info "Installing Python dependencies for web server..."
         pip3 install -r /usr/lib/pitrac/web-server/requirements.txt --break-system-packages 2>/dev/null || \
         pip3 install -r /usr/lib/pitrac/web-server/requirements.txt
-        
+
         if [[ -f /usr/lib/pitrac/web-server/pitrac-web.service ]]; then
             cp /usr/lib/pitrac/web-server/pitrac-web.service /etc/systemd/system/
+
+            # Get the actual user who invoked sudo (if any) for service configuration
+            ACTUAL_USER="${SUDO_USER:-$(whoami)}"
+            if [[ "$ACTUAL_USER" != "root" ]]; then
+                log_info "Configuring web service to run as user: $ACTUAL_USER"
+                mkdir -p /etc/systemd/system/pitrac-web.service.d
+                cat > /etc/systemd/system/pitrac-web.service.d/override.conf <<EOF
+[Service]
+User=$ACTUAL_USER
+Group=$ACTUAL_USER
+DynamicUser=no
+EOF
+            fi
         fi
-        
+
         log_success "Web server installed"
     else
         log_warn "Web server source not found at $WEB_SERVER_DIR"

@@ -68,7 +68,7 @@ case "$1" in
             chown -R tomee:tomee /opt/tomee
             chmod 755 /opt/tomee/bin/*.sh
         fi
-        
+
         # Install Python web server dependencies
         if [ -d /usr/lib/pitrac/web-server ]; then
             echo "Installing Python web server dependencies..."
@@ -110,14 +110,14 @@ case "$1" in
 
         # Configure libcamera settings
         echo "Configuring libcamera..."
-        
+
         # Use existing example.yaml files as base for configuration
         # Both Pi 4 (vc4) and Pi 5 (pisp) ship with example.yaml
         for pipeline in pisp vc4; do
             CAMERA_DIR="/usr/share/libcamera/pipeline/rpi/${pipeline}"
             EXAMPLE_FILE="${CAMERA_DIR}/example.yaml"
             CAMERA_CONFIG="${CAMERA_DIR}/rpi_apps.yaml"
-            
+
             # Only proceed if the pipeline directory exists (Pi 4 has vc4, Pi 5 has pisp)
             if [ -d "$CAMERA_DIR" ]; then
                 # If example exists but rpi_apps doesn't, copy and configure
@@ -184,6 +184,16 @@ case "$1" in
 
         # Enable web server or TomEE
         if [ -f /etc/systemd/system/pitrac-web.service ]; then
+            # If we have an actual user, create a drop-in to override the user
+            if [ -n "$ACTUAL_USER" ]; then
+                mkdir -p /etc/systemd/system/pitrac-web.service.d
+                cat > /etc/systemd/system/pitrac-web.service.d/override.conf <<EOF
+[Service]
+User=$ACTUAL_USER
+Group=$ACTUAL_USER
+DynamicUser=no
+EOF
+            fi
             systemctl enable pitrac-web.service || true
         elif [ -f /etc/systemd/system/tomee.service ]; then
             systemctl enable tomee.service || true

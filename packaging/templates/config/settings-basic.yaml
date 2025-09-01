@@ -204,9 +204,9 @@ storage:
 network:
   # ActiveMQ broker address (for dual camera mode)
   # Format: tcp://hostname:port or PITRAC_MSG_BROKER_FULL_ADDRESS
-  # Default: tcp://localhost:61616
+  # Default: tcp://127.0.0.1:61616
   # Maps to: gs_config.ipc_interface.kWebActiveMQHostAddress
-  broker_address: "tcp://localhost:61616"
+  broker_address: "tcp://127.0.0.1:61616"
   
   # Web interface refresh interval
   # Range: 1-60 seconds
