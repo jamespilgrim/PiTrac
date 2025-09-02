@@ -1,7 +1,7 @@
 [Unit]
 Description=PiTrac Launch Monitor
-After=network.target activemq.service tomee.service
-Wants=activemq.service tomee.service
+After=network.target activemq.service pitrac-web.service
+Wants=activemq.service pitrac-web.service
 
 [Service]
 Type=simple
