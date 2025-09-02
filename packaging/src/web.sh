@@ -7,9 +7,6 @@ case "$action" in
     # Check which server is installed
     if [[ -f /etc/systemd/system/pitrac-web.service ]]; then
       start_service "pitrac-web"
-    elif [[ -f /etc/systemd/system/tomee.service ]]; then
-      info "Using legacy TomEE server..."
-      start_service "tomee"
     else
       error "No web server service found"
       exit 1
@@ -19,8 +16,6 @@ case "$action" in
     info "Stopping web server..."
     if systemctl is-active --quiet pitrac-web; then
       stop_service "pitrac-web"
-    elif systemctl is-active --quiet tomee; then
-      stop_service "tomee"
     else
       warn "No web server is running"
     fi
@@ -29,8 +24,6 @@ case "$action" in
     info "Restarting web server..."
     if [[ -f /etc/systemd/system/pitrac-web.service ]]; then
       restart_service "pitrac-web"
-    elif [[ -f /etc/systemd/system/tomee.service ]]; then
-      restart_service "tomee"
     else
       error "No web server service found"
       exit 1
@@ -39,8 +32,6 @@ case "$action" in
   status)
     if [[ -f /etc/systemd/system/pitrac-web.service ]]; then
       get_service_status "pitrac-web"
-    elif [[ -f /etc/systemd/system/tomee.service ]]; then
-      get_service_status "tomee"
     else
       error "No web server service found"
       exit 1
@@ -51,8 +42,6 @@ case "$action" in
     local service_name=""
     if [[ -f /etc/systemd/system/pitrac-web.service ]]; then
       service_name="pitrac-web"
-    elif [[ -f /etc/systemd/system/tomee.service ]]; then
-      service_name="tomee"
     else
       error "No web server service found"
       exit 1

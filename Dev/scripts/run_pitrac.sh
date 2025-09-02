@@ -89,11 +89,11 @@ check_runtime_dependencies() {
         fi
     fi
     
-    # Check if TomEE is running for web interface
+    # Check if web server is running for web interface
     if [ "$ENABLE_WEB_SERVER" = "1" ]; then
-        if ! systemctl is-active --quiet tomee 2>/dev/null && \
-           ! pgrep -f tomee >/dev/null 2>&1; then
-            warnings="${warnings}  - TomEE web server not running\n"
+        if ! systemctl is-active --quiet pitrac-web 2>/dev/null && \
+           ! pgrep -f "python.*main.py" >/dev/null 2>&1; then
+            warnings="${warnings}  - PiTrac web server not running\n"
         fi
     fi
     

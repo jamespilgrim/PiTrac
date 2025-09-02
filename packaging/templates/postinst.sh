@@ -20,15 +20,6 @@ case "$1" in
         PI_MODEL=$(detect_pi_model)
         echo "Detected Pi model: $PI_MODEL"
 
-        # Create tomee user/group (only if TomEE is installed)
-        if [ -d /opt/tomee ]; then
-            if ! getent group tomee >/dev/null; then
-                groupadd -r tomee
-            fi
-            if ! getent passwd tomee >/dev/null; then
-                useradd -r -g tomee -d /opt/tomee -s /bin/false tomee
-            fi
-        fi
 
         # Get the actual user who invoked sudo (if any)
         ACTUAL_USER="${SUDO_USER:-}"
@@ -63,11 +54,6 @@ case "$1" in
             chmod 644 /etc/pitrac/golf_sim_config.json
         fi
 
-        # Set TomEE permissions (only if installed)
-        if [ -d /opt/tomee ]; then
-            chown -R tomee:tomee /opt/tomee
-            chmod 755 /opt/tomee/bin/*.sh
-        fi
 
         # Install Python web server dependencies
         if [ -d /usr/lib/pitrac/web-server ]; then
@@ -182,7 +168,7 @@ case "$1" in
         # Enable services (but don't start)
         systemctl enable pitrac.service || true
 
-        # Enable web server or TomEE
+        # Enable web server
         if [ -f /etc/systemd/system/pitrac-web.service ]; then
             # If we have an actual user, create a drop-in to override the user
             if [ -n "$ACTUAL_USER" ]; then
@@ -195,8 +181,6 @@ DynamicUser=no
 EOF
             fi
             systemctl enable pitrac-web.service || true
-        elif [ -f /etc/systemd/system/tomee.service ]; then
-            systemctl enable tomee.service || true
         fi
 
         echo ""

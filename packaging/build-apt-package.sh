@@ -32,8 +32,7 @@ check_prerequisites() {
     
     local missing=0
     for artifact in opencv-4.11.0-arm64.tar.gz activemq-cpp-3.9.5-arm64.tar.gz \
-                    lgpio-0.2.2-arm64.tar.gz msgpack-cxx-6.1.1-arm64.tar.gz \
-                    tomee-10.1.0-plume-arm64.tar.gz; do
+                    lgpio-0.2.2-arm64.tar.gz msgpack-cxx-6.1.1-arm64.tar.gz; do
         if [[ ! -f "$POC_DIR/deps-artifacts/$artifact" ]]; then
             log_error "Missing artifact: $artifact"
             missing=1
@@ -140,7 +139,7 @@ create_cli_wrapper() {
 prepare_build_env() {
     log_info "Preparing build environment..."
     rm -rf "$BUILD_DIR"
-    mkdir -p "$DEB_DIR"/{DEBIAN,usr/{bin,lib/pitrac,share/{pitrac,doc/pitrac}},etc/pitrac,opt/{tomee,pitrac},var/lib/pitrac}
+    mkdir -p "$DEB_DIR"/{DEBIAN,usr/{bin,lib/pitrac,share/{pitrac,doc/pitrac}},etc/pitrac,opt/pitrac,var/lib/pitrac}
     mkdir -p "$DEB_DIR/etc/systemd/system"
     mkdir -p "$DEB_DIR/usr/share/pitrac"/{webapp,test-images,calibration}
     mkdir -p "$DEB_DIR/etc/pitrac/config"
@@ -244,7 +243,7 @@ bundle_dependencies() {
     fi
     rm -rf /tmp/msgpack
     
-    # Install Python web server instead of TomEE
+    # Install Python web server
     log_info "  PiTrac Web Server..."
     WEB_SERVER_DIR="$REPO_ROOT/Software/web-server"
     if [[ -d "$WEB_SERVER_DIR" ]]; then
@@ -252,11 +251,8 @@ bundle_dependencies() {
         cp -r "$WEB_SERVER_DIR"/* "$DEB_DIR/usr/lib/pitrac/web-server/"
         log_info "    Web server files copied"
     else
-        # Fallback to TomEE if web server not available
-        log_warn "  Web server not found, falling back to TomEE..."
-        if [[ -f "$POC_DIR/deps-artifacts/tomee-10.1.0-plume-arm64.tar.gz" ]]; then
-            tar xzf "$POC_DIR/deps-artifacts/tomee-10.1.0-plume-arm64.tar.gz" -C "$DEB_DIR/opt/"
-        fi
+        log_error "  Web server not found at $WEB_SERVER_DIR"
+        exit 1
     fi
     
     strip --strip-unneeded "$lib_dir"/*.so* 2>/dev/null || true
@@ -290,12 +286,8 @@ create_configs() {
     if [[ -f "$DEB_DIR/usr/lib/pitrac/web-server/pitrac-web.service" ]]; then
         cp "$DEB_DIR/usr/lib/pitrac/web-server/pitrac-web.service" "$DEB_DIR/etc/systemd/system/"
     else
-        # Fallback to TomEE service if web server not available
-        if [[ -f "$SCRIPT_DIR/templates/tomee.service" ]]; then
-            cp "$SCRIPT_DIR/templates/tomee.service" "$DEB_DIR/etc/systemd/system/tomee.service"
-            cp "$SCRIPT_DIR/templates/tomee-wrapper.sh" "$DEB_DIR/usr/lib/pitrac/tomee-wrapper.sh"
-            chmod 755 "$DEB_DIR/usr/lib/pitrac/tomee-wrapper.sh"
-        fi
+        log_error "Web server service file not found"
+        exit 1
     fi
 
     log_success "Configs created"
@@ -322,7 +314,7 @@ Homepage: https://github.com/jamespilgrim/PiTrac
 Description: $DESCRIPTION
  PiTrac uses Raspberry Pi cameras to track golf ball
  launch parameters. Includes pre-built binaries with
- OpenCV 4.11.0, ActiveMQ-CPP, and TomEE web server.
+ OpenCV 4.11.0, ActiveMQ-CPP, and Python web server.
 EOF
 
     cp "$SCRIPT_DIR/templates/postinst.sh" "$DEB_DIR/DEBIAN/postinst"
@@ -350,7 +342,7 @@ build_package() {
     chmod 755 debian/usr/bin/pitrac
     chmod 755 debian/usr/lib/pitrac/pitrac_lm
     chmod 755 debian/usr/lib/pitrac/calibration-wizard
-    chmod -R 755 debian/opt/tomee/bin
+    # No TomEE to set permissions for
     
     dpkg-deb --root-owner-group --build debian "$PACKAGE_NAME.deb"
     
