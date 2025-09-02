@@ -20,6 +20,9 @@ class TestActiveMQIntegration:
         
         listener = ActiveMQListener()
         
+        mock_loop = MagicMock()
+        listener.loop = mock_loop
+        
         shot_data = {
             "speed": 150.0,
             "carry": 270.0,
@@ -36,9 +39,9 @@ class TestActiveMQIntegration:
         mock_frame = MagicMock()
         mock_frame.body = packed_data
         
-        with patch('main.asyncio.create_task') as mock_create_task:
+        with patch('main.asyncio.run_coroutine_threadsafe') as mock_run_coroutine:
             listener.on_message(mock_frame)
-            mock_create_task.assert_called_once()
+            mock_run_coroutine.assert_called_once()
     
     def test_activemq_error_handling(self):
         """Test ActiveMQ error handling"""
