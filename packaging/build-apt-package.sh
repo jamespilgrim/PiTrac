@@ -141,7 +141,7 @@ prepare_build_env() {
     rm -rf "$BUILD_DIR"
     mkdir -p "$DEB_DIR"/{DEBIAN,usr/{bin,lib/pitrac,share/{pitrac,doc/pitrac}},etc/pitrac,opt/pitrac,var/lib/pitrac}
     mkdir -p "$DEB_DIR/etc/systemd/system"
-    mkdir -p "$DEB_DIR/usr/share/pitrac"/{webapp,test-images,calibration}
+    mkdir -p "$DEB_DIR/usr/share/pitrac"/{webapp,test-images,calibration,templates}
     mkdir -p "$DEB_DIR/etc/pitrac/config"
     log_success "Build directories created"
 }
@@ -280,7 +280,10 @@ create_configs() {
         log_warn "Configuration templates not found in $SCRIPT_DIR/templates/config/"
     fi
 
-    cp "$SCRIPT_DIR/templates/pitrac.service" "$DEB_DIR/etc/systemd/system/pitrac.service"
+    cp "$SCRIPT_DIR/templates/pitrac.service.template" "$DEB_DIR/usr/share/pitrac/templates/pitrac.service.template"
+    
+    cp "$SCRIPT_DIR/src/lib/service-install.sh" "$DEB_DIR/usr/lib/pitrac/service-install.sh"
+    chmod 755 "$DEB_DIR/usr/lib/pitrac/service-install.sh"
     
     # Install web server service
     if [[ -f "$DEB_DIR/usr/lib/pitrac/web-server/pitrac-web.service" ]]; then
