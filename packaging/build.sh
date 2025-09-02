@@ -217,6 +217,17 @@ build_dev() {
         log_info "Force rebuild requested - will clean build directory"
     fi
 
+    log_info "Regenerating pitrac CLI tool..."
+    if [[ -f "$SCRIPT_DIR/generate.sh" ]]; then
+        cd "$SCRIPT_DIR"
+        ./generate.sh
+        cd - > /dev/null
+        log_success "Regenerated pitrac CLI tool"
+    else
+        log_error "generate.sh not found!"
+        exit 1
+    fi
+
     # Check artifacts exist
     if ! check_artifacts; then
         log_error "Missing dependency artifacts. These should be in git."
@@ -474,18 +485,6 @@ EOF
     install -m 755 build/pitrac_lm /usr/lib/pitrac/pitrac_lm
 
     log_info "Installing CLI tool..."
-    if [[ ! -f "$SCRIPT_DIR/pitrac" ]]; then
-        log_warn "Bashly CLI not found, generating it now..."
-        if [[ -f "$SCRIPT_DIR/generate.sh" ]]; then
-            cd "$SCRIPT_DIR"
-            ./generate.sh
-            cd - > /dev/null
-            log_success "Generated pitrac CLI tool"
-        else
-            log_error "generate.sh not found!"
-            exit 1
-        fi
-    fi
     install -m 755 "$SCRIPT_DIR/pitrac" /usr/bin/pitrac
 
     # Install camera tools
@@ -632,12 +631,22 @@ EOF
     log_info "Installing systemd services..."
     cp "$SCRIPT_DIR/templates/pitrac.service" /etc/systemd/system/pitrac.service
 
-    # Install Python web server
-    log_info "Installing PiTrac web server..."
+    # Install Python web server (always update)
+    log_info "Installing/Updating PiTrac web server..."
     WEB_SERVER_DIR="$REPO_ROOT/Software/web-server"
     if [[ -d "$WEB_SERVER_DIR" ]]; then
+        WEB_SERVICE_WAS_RUNNING=false
+        if systemctl is-active --quiet pitrac-web.service; then
+            WEB_SERVICE_WAS_RUNNING=true
+            log_info "Stopping web server for update..."
+            systemctl stop pitrac-web.service
+        fi
+
+        log_info "Cleaning previous web server installation..."
+        rm -rf /usr/lib/pitrac/web-server
         mkdir -p /usr/lib/pitrac/web-server
 
+        log_info "Copying latest web server files..."
         cp -r "$WEB_SERVER_DIR"/* /usr/lib/pitrac/web-server/
 
         log_info "Installing Python dependencies for web server..."
@@ -659,9 +668,25 @@ Group=$ACTUAL_USER
 DynamicUser=no
 EOF
             fi
+
+            systemctl daemon-reload
+
+            if [[ "$WEB_SERVICE_WAS_RUNNING" == "true" ]]; then
+                log_info "Restarting web server with updated code..."
+                systemctl start pitrac-web.service
+                
+                sleep 2
+                if systemctl is-active --quiet pitrac-web.service; then
+                    log_success "Web server restarted successfully"
+                else
+                    log_error "Web server failed to restart. Check logs with: journalctl -u pitrac-web.service"
+                fi
+            else
+                log_info "Web server installed but not started (was not running before)"
+            fi
         fi
 
-        log_success "Web server installed"
+        log_success "Web server updated"
     else
         log_warn "Web server source not found at $WEB_SERVER_DIR"
     fi
@@ -678,14 +703,22 @@ EOF
     echo ""
     echo "PiTrac has been installed to system locations:"
     echo "  Binary: /usr/lib/pitrac/pitrac_lm"
-    echo "  CLI: /usr/bin/pitrac"
+    echo "  CLI: /usr/bin/pitrac (regenerated)"
     echo "  Libraries: /usr/lib/pitrac/"
     echo "  Configs: /etc/pitrac/"
+    echo "  Web Server: /usr/lib/pitrac/web-server (updated)"
     echo ""
     echo "You can now run:"
     echo "  pitrac test quick   # Test image processing"
     echo "  pitrac run          # Start tracking (requires cameras)"
     echo "  pitrac help         # Show all commands"
+    echo ""
+    echo "Web server status:"
+    if systemctl is-active --quiet pitrac-web.service; then
+        echo "  Service is running. Access at http://$(hostname -I | cut -d' ' -f1):5000"
+    else
+        echo "  Service is not running. Start with: sudo systemctl start pitrac-web.service"
+    fi
     echo ""
     echo "To rebuild after code changes:"
     echo "  sudo ./build.sh dev         # Fast incremental build (only changed files)"
