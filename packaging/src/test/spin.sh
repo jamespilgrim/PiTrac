@@ -1,3 +1,5 @@
+initialize_global_flags
+
 
 echo "=== Spin Detection Test ==="
 echo "Testing spin algorithms (no camera required)"
@@ -7,5 +9,9 @@ ensure_golf_config
 setup_pitrac_environment
 
 echo "Processing spin detection..."
-"$PITRAC_BINARY" --system_mode=test_spin --logging_level=info "$@"
+
+pitrac_args=()
+build_pitrac_logging_args pitrac_args
+
+"$PITRAC_BINARY" --system_mode=test_spin "${pitrac_args[@]}" "$@"
 echo "Spin test complete."

@@ -10,6 +10,8 @@ toc: true
 
 # PiTrac Automated Setup
 
+PLEASE NOTE:  This feature has been largely deprecated.  Please consider using the [Build System]({% link development/build-system.md %}).
+
 Forget spending hours copying commands from tutorials. The Dev installer gets your Pi ready for PiTrac in about 30 minutes, and most of that is just waiting for stuff to compile.
 
 ## What You Get

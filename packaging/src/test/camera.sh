@@ -1,3 +1,5 @@
+initialize_global_flags
+
 
 slot="${args[slot]}"
 
@@ -17,7 +19,7 @@ else
   exit 1
 fi
 
-# Fix system mode naming (snake_case to camelCase)
-mode="${mode//_test_standalone/TestStandalone}"
+pitrac_args=()
+build_pitrac_logging_args pitrac_args
 
-"$PITRAC_BINARY" --system_mode="$mode" --logging_level=info "$@"
+"$PITRAC_BINARY" --system_mode="$mode" "${pitrac_args[@]}" "$@"
