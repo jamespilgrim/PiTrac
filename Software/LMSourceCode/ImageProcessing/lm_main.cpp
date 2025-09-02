@@ -126,7 +126,7 @@ void test_image(std::string_view subdir, std::string_view filename) {
     // Create a single output file with the result overlaid on the original image, along with
     // whatever other debug images that we want.
 
-    /******  THIS FUNCTION SHOULD BE DELETED - TBD 
+    /******  THIS FUNCTION SHOULD BE DELETED - TBD
     cv::Mat outputImage;
 
     auto ncFinalArray = nc::NdArray<nc::uint8>(ip->final_result_image_.data, ip->final_result_image_.rows, ip->final_result_image_.cols);
@@ -192,7 +192,7 @@ void test_all_test_files() {
 }
 
 void test_calibrated_location(std::string twoFootImgName, std::string threeFootImgName, std::string fourFootImgName) {
-    
+
     cv::Mat img = cv::imread(twoFootImgName);
     LoggingTools::ShowImage(twoFootImgName, img);
 
@@ -261,7 +261,7 @@ bool testProjection() {
     /*
     gfilters = create_gaborfilter()
     image_g = apply_filter(myimage, gfilters)
-    
+
     min_interval = 120
     max_interval = 250
     image_edge_g = cv2.Canny(image_g, min_interval, max_interval)
@@ -275,17 +275,17 @@ bool testProjection() {
 }
 
 void showVisualization() {
-    /* TBD - probably too much work to get Viz working 
-    ///Createawindow 
-    viz::Viz3dmyWindow("VizDemo"); 
-    ///Starteventloop 
+    /* TBD - probably too much work to get Viz working
+    ///Createawindow
+    viz::Viz3dmyWindow("VizDemo");
+    ///Starteventloop
     myWindow.spin();
 
-    ///Eventloopisoverwhenpressedq,Q,e,E cout<<"Firsteventloopisover"<<endl; 
-    ///Accesswindowviaitsname 
-    viz::Viz3dsameWindow=viz::getWindowByName("VizDemo"); 
-    /// ///Starteventloop 
-    sameWindow.spin(); 
+    ///Eventloopisoverwhenpressedq,Q,e,E cout<<"Firsteventloopisover"<<endl;
+    ///Accesswindowviaitsname
+    viz::Viz3dsameWindow=viz::getWindowByName("VizDemo");
+    /// ///Starteventloop
+    sameWindow.spin();
     /// ///Eventloopisoverwhenpressedq,Q,e,E
     cout<<"Secondeventloopisover"<<endl;
     /// ///Eventloopisoverwhenpressedq,Q,e,E
@@ -353,7 +353,7 @@ bool testSpinDetection() {
 
     // Get the ball data.  We will calibrate based on the first ball and then get the second one
     // using that calibrated data from the first ball.
-    
+
     GolfSimCamera c;
     c.camera_hardware_.init_camera_parameters(GsCameraNumber::kGsCamera1, camera_2_model, camera_2_lens_type);
 
@@ -424,7 +424,7 @@ bool TestSpin() {
 
     int keyPressed = cv::waitKey(0) & 0xFF;
 
-#ifdef __unix__   
+#ifdef __unix__
 
     // Find the first ball.  This will cause a pause to view the image
     // that will allow the user to reposition the ball for a second time
@@ -468,13 +468,13 @@ bool testAnalyzeStrobedBalls() {
     GolfSimConfiguration::SetConstant("gs_config.testing.kTwoImageTestPreImage", kTwoImageTestPreImage);
 
     const std::string kTestCamImageFileName_00 = kTwoImageTestTeedBallImage;
-   
+
     const std::string kTestCam2StrobedmageFileName = kTwoImageTestStrobedImage;
 
     cv::Mat ball1ImgGray;
     cv::Mat ball2ImgGray;
     cv::Mat ball1ImgColor;
-    cv::Mat ball2ImgColor; 
+    cv::Mat ball2ImgColor;
 
     const GsCameraNumber camera_number = GolfSimOptions::GetCommandLineOptions().GetCameraNumber();
     const CameraHardware::CameraModel camera_model = GolfSimCamera::kSystemSlot1CameraType;
@@ -503,12 +503,12 @@ bool testAnalyzeStrobedBalls() {
     cv::Mat exposures_image;
     std::vector<GolfBall> exposure_balls;
 
-    if (!GolfSimCamera::ProcessReceivedCam2Image(ball1ImgColor, 
-                                                 ball2ImgColor, 
-                                                 camera2_pre_image_color, 
-                                                 result_ball, 
-                                                 rotation_results, 
-                                                 exposures_image, 
+    if (!GolfSimCamera::ProcessReceivedCam2Image(ball1ImgColor,
+                                                 ball2ImgColor,
+                                                 camera2_pre_image_color,
+                                                 result_ball,
+                                                 rotation_results,
+                                                 exposures_image,
                                                  exposure_balls)) {
         GS_LOG_MSG(error, "Failed ProcessReceivedCam2Image.");
         return false;
@@ -706,7 +706,7 @@ void WaitForSimArmed() {
             break;
 
         GS_LOG_TRACE_MSG(info, "Waiting for interface armed...");
-#ifdef __unix__   
+#ifdef __unix__
         sleep(1);
 #endif
     }
@@ -739,7 +739,7 @@ bool TestExternalSimMessage() {
         return false;
     }
 
-#ifdef __unix__   
+#ifdef __unix__
     // Give the system time to connect, exchange any handshaking, etc.
     sleep(15);
 #endif
@@ -752,7 +752,7 @@ bool TestExternalSimMessage() {
     test_result.back_spin_rpm_ = 3456;
     test_result.side_spin_rpm_ = -567;
 
-#ifdef __unix__   
+#ifdef __unix__
 
     // If we are interfacing with a TruGolf/E6 system, then we need to make sure that it is armed before
     // sending shot information.  For GSPro, the arming is not important.
@@ -915,7 +915,7 @@ void run_main(int argc, char* argv[])
     GolfSimConfiguration::SetConstant("gs_config.modes.kStartInPuttingMode", kStartInPuttingMode);
 
 
-#ifdef __unix__   
+#ifdef __unix__
     // What the program will do depends on its mode
 
 
@@ -941,7 +941,7 @@ void run_main(int argc, char* argv[])
         return;
     }
 
- 
+
 
     if (GolfSimOptions::GetCommandLineOptions().send_test_results_) {
 
@@ -972,14 +972,18 @@ void run_main(int argc, char* argv[])
 
         for (GsResults& result : shots) {
             GS_LOG_MSG(info, "********   READY FOR SHOT NO. " + std::to_string(result.shot_number_) + " ********");
-            
+
             GS_LOG_MSG(info, "********   PLEASE RE-ARM THE SIMULATOR TO ACCEPT ANOTHER SHOT  ********");
 
             sleep(kInterShotInjectionPauseSeconds);
 
-            while(!GsSimInterface::GetAllSystemsArmed()) {
-                sleep(2);
-                GS_LOG_MSG(info, "            Waiting for Simulator to Arm.");
+            if (!GolfSimOptions::GetCommandLineOptions().skip_wait_armed_) {
+                while(!GsSimInterface::GetAllSystemsArmed()) {
+                    sleep(2);
+                    GS_LOG_MSG(info, "            Waiting for Simulator to Arm.");
+                }
+            } else {
+                GS_LOG_MSG(info, "            Skipping wait for simulator armed (hardware-less testing mode).");
             }
 
             GsSimInterface::IncrementShotCounter();
@@ -988,9 +992,20 @@ void run_main(int argc, char* argv[])
             if (!GsSimInterface::SendResultsToGolfSims(result)) {
                 GS_LOG_MSG(error, "Could not SendResultsToGolfSim. Continuing");
             }
+
+            // Also send to Python webserver via IPC for monitoring
+            GolfBall test_ball;
+            test_ball.velocity_ = result.speed_mph_ * 0.44704;  // Convert mph to m/s
+            test_ball.angles_ball_perspective_[0] = result.hla_deg_;
+            test_ball.angles_ball_perspective_[1] = result.vla_deg_;
+            test_ball.rotation_speeds_RPM_[0] = result.side_spin_rpm_;
+            test_ball.rotation_speeds_RPM_[2] = result.back_spin_rpm_;
+
+            std::string message = "Test shot #" + std::to_string(result.shot_number_);
+            GsUISystem::SendIPCHitMessage(test_ball, message);
         }
 
-        /**** DEPRECATED 
+        /**** DEPRECATED
         // Also send one IPC result to test the GUI
         ipc_results.result_type_ = GsIPCResultType::kBallPlacedAndReadyForHit;
         ipc_results.speed_mpers_ = 50.25 + rand() % 40;
@@ -1021,7 +1036,7 @@ void run_main(int argc, char* argv[])
 
     // In this mode, we just take a single picture and save it.
     // Only do so locally if this is the camera1 system, of course
-    // If in cam2_still_mode on the camera2 system, send the shutter 
+    // If in cam2_still_mode on the camera2 system, send the shutter
     // and strobe pulses asap, though the difference in
     // operation will be the number of strobe pulses is cut to 1
     // NOTE - when running in still mode for camera2, the Pi2/Camera2 process
@@ -1068,7 +1083,7 @@ void run_main(int argc, char* argv[])
         LoggingTools::LogImage("", image, std::vector < cv::Point >{}, true, save_file_name);
 
         PerformSystemShutdownTasks();
- 
+
         return;
     }
 
@@ -1099,7 +1114,7 @@ void run_main(int argc, char* argv[])
             RunGolfSimFsm(camera1_state);
             break;
         }
-        
+
         case SystemMode::kCamera2:
         case SystemMode::kCamera2TestStandalone:
         case SystemMode::kRunCam2ProcessForPi1Processing:
@@ -1110,7 +1125,7 @@ void run_main(int argc, char* argv[])
             RunGolfSimFsm(camera2_state);
             break;
         }
-        
+
         case SystemMode::kTestSpin:
         {
                 GS_LOG_MSG(info, "Running in kTestSpin mode.");
@@ -1198,7 +1213,7 @@ void run_main(int argc, char* argv[])
 
             for (int i = 0; i < number_attempts; i++) {
                 if (!CheckForBall(ball, img)) {
-                    GS_LOG_TRACE_MSG(trace, "Failed to CheckForBall - skipping"); 
+                    GS_LOG_TRACE_MSG(trace, "Failed to CheckForBall - skipping");
                     continue;
                 }
 
@@ -1208,7 +1223,7 @@ void run_main(int argc, char* argv[])
                 average_focal_length += ball.calibrated_focal_length_;
                 std::string calibration_results_message = "Focal Length = " + std::to_string(ball.calibrated_focal_length_) + ".";
                 GS_LOG_MSG(info, calibration_results_message);
-#ifdef __unix__ 
+#ifdef __unix__
                 GsUISystem::SendIPCStatusMessage(GsIPCResultType::kCalibrationResults, calibration_results_message);
 #endif
             }
@@ -1535,7 +1550,7 @@ int main(int argc, char *argv[])
     }
 
     GS_LOG_TRACE_MSG(trace, "Finished run_main.");
-    
+
     // GS_LOG_TRACE_MSG(trace, "Waiting for any keypress to end program.");
     // cv::waitKey(0);
 

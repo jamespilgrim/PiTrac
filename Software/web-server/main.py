@@ -5,6 +5,7 @@ Serves dashboard, handles ActiveMQ messages, and manages shot images
 """
 
 import asyncio
+import base64
 import json
 import logging
 import os
@@ -75,6 +76,7 @@ class ActiveMQListener(stomp.ConnectionListener):
 
     def __init__(self):
         self.connected = False
+        self.loop = None 
 
     def on_error(self, frame):
         logger.error(f'ActiveMQ error: {frame.body}')
@@ -82,8 +84,6 @@ class ActiveMQListener(stomp.ConnectionListener):
     def on_message(self, frame):
         """Process incoming message from ActiveMQ"""
         try:
-            # ActiveMQ sends binary msgpack data
-            # STOMP may decode it as string, we need raw bytes
             if hasattr(frame, 'body'):
                 if isinstance(frame.body, bytes):
                     body = frame.body
@@ -93,15 +93,31 @@ class ActiveMQListener(stomp.ConnectionListener):
                     except:
                         body = bytes([ord(c) if ord(c) < 256 else ord(c) & 0xFF for c in frame.body])
 
-                if len(body) > 10 and body[0] == 0xfd:
-                    msgpack_data = body[10:]
+
+                if hasattr(frame, 'headers'):
+                    logger.info(f"Frame headers: {frame.headers}")
+
+                    if frame.headers.get('encoding') == 'base64':
+                        logger.info("Message is base64 encoded, decoding...")
+                        if isinstance(body, bytes):
+                            base64_str = body.decode('utf-8')
+                        else:
+                            base64_str = body
+                        msgpack_data = base64.b64decode(base64_str)
+                        logger.info(f"Decoded {len(msgpack_data)} bytes from base64")
+                    else:
+                        msgpack_data = body
                 else:
+                    # No headers, assume old format
                     msgpack_data = body
 
                 # Unpack msgpack data
-                data = msgpack.unpackb(msgpack_data, raw=False)
-                logger.info(f"Received shot data")
-                asyncio.create_task(process_shot_data(data))
+                data = msgpack.unpackb(msgpack_data, raw=False, strict_map_key=False)
+
+                if self.loop:
+                    asyncio.run_coroutine_threadsafe(process_shot_data(data), self.loop)
+                else:
+                    logger.error("Event loop not set in listener")
             else:
                 logger.error("Frame has no body attribute")
         except Exception as e:
@@ -116,31 +132,63 @@ class ActiveMQListener(stomp.ConnectionListener):
         self.connected = False
 
 
-async def process_shot_data(data: Dict):
+async def process_shot_data(data):
     """Process shot data and notify clients"""
     global current_shot
 
-    if "speed" in data:
-        current_shot["speed"] = round(data["speed"], 1)
-    if "carry" in data:
-        current_shot["carry"] = round(data["carry"], 1)
-    if "launch_angle" in data:
-        current_shot["launch_angle"] = round(data["launch_angle"], 1)
-    if "side_angle" in data:
-        current_shot["side_angle"] = round(data["side_angle"], 1)
-    if "back_spin" in data:
-        current_shot["back_spin"] = int(data["back_spin"])
-    if "side_spin" in data:
-        current_shot["side_spin"] = int(data["side_spin"])
-    if "result_type" in data:
-        current_shot["result_type"] = ResultType(data["result_type"]).name.replace("_", " ").title()
-    if "message" in data:
-        current_shot["message"] = data["message"]
+    if isinstance(data, list):
+        # Array format from C++ MessagePack (MSGPACK_DEFINE order)
+        # [carry_meters, speed_mpers, launch_angle_deg, side_angle_deg,
+        #  back_spin_rpm, side_spin_rpm, confidence, club_type, result_type, message, log_messages]
+        if len(data) >= 11:
+            carry_meters = data[0]
+            speed_mpers = data[1]
+            launch_angle_deg = data[2]
+            side_angle_deg = data[3]
+            back_spin_rpm = data[4]
+            side_spin_rpm = data[5]
+            confidence = data[6]
+            club_type = data[7]
+            result_type = data[8]
+            message = data[9]
+            log_messages = data[10] if len(data) > 10 else []
+
+            # Convert to UI format
+            current_shot["carry"] = carry_meters
+            current_shot["speed"] = round(speed_mpers * 2.237, 1)  # Convert m/s to mph
+            current_shot["launch_angle"] = round(launch_angle_deg, 1)
+            current_shot["side_angle"] = round(side_angle_deg, 1)
+            current_shot["back_spin"] = int(back_spin_rpm)
+            current_shot["side_spin"] = int(side_spin_rpm)
+
+            try:
+                current_shot["result_type"] = ResultType(result_type).name.replace("_", " ").title()
+            except:
+                current_shot["result_type"] = f"Type {result_type}"
+
+            current_shot["message"] = message
+            logger.info(f"Processed shot: speed={current_shot['speed']} mph, launch={current_shot['launch_angle']}°, side={current_shot['side_angle']}°")
+    else:
+        if "speed" in data:
+            current_shot["speed"] = round(data["speed"], 1)
+        if "carry" in data:
+            current_shot["carry"] = round(data["carry"], 1)
+        if "launch_angle" in data:
+            current_shot["launch_angle"] = round(data["launch_angle"], 1)
+        if "side_angle" in data:
+            current_shot["side_angle"] = round(data["side_angle"], 1)
+        if "back_spin" in data:
+            current_shot["back_spin"] = int(data["back_spin"])
+        if "side_spin" in data:
+            current_shot["side_spin"] = int(data["side_spin"])
+        if "result_type" in data:
+            current_shot["result_type"] = ResultType(data["result_type"]).name.replace("_", " ").title()
+        if "message" in data:
+            current_shot["message"] = data["message"]
+        if "image_paths" in data:
+            current_shot["images"] = data["image_paths"]
 
     current_shot["timestamp"] = datetime.now().isoformat()
-
-    if "image_paths" in data:
-        current_shot["images"] = data["image_paths"]
 
     for client in websocket_clients:
         try:
@@ -149,7 +197,7 @@ async def process_shot_data(data: Dict):
             websocket_clients.remove(client)
 
 
-def setup_activemq():
+def setup_activemq(loop=None):
     """Connect to ActiveMQ broker"""
     try:
         config = {}
@@ -169,6 +217,7 @@ def setup_activemq():
 
         conn = stomp.Connection([(broker_host, broker_port)])
         listener = ActiveMQListener()
+        listener.loop = loop  # Set the event loop in the listener
         conn.set_listener('', listener)
         conn.connect('admin', 'admin', wait=True)
         conn.subscribe(destination='/topic/Golf.Sim', id=1, ack='auto')
@@ -183,7 +232,8 @@ def setup_activemq():
 @app.on_event("startup")
 async def startup_event():
     """Initialize connections on startup"""
-    app.state.mq_conn = setup_activemq()
+    loop = asyncio.get_event_loop()
+    app.state.mq_conn = setup_activemq(loop)
 
 
 @app.on_event("shutdown")
@@ -232,6 +282,7 @@ async def get_image(filename: str):
     if image_path.exists():
         return FileResponse(image_path)
     return {"error": "Image not found"}
+
 
 
 @app.post("/api/reset")
