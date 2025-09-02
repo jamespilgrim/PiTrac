@@ -1,27 +1,27 @@
 import json
 import msgpack
 import pytest
-from unittest.mock import MagicMock, patch, call
+import asyncio
+import base64
+from unittest.mock import MagicMock, AsyncMock, patch, call
+from models import ShotData
+from listeners import ActiveMQListener
 
 
 @pytest.mark.integration
 class TestActiveMQIntegration:
     """Test ActiveMQ message handling"""
     
-    def test_activemq_connection_setup(self, app, mock_activemq):
+    def test_activemq_connection_setup(self, server_instance, mock_activemq):
         """Test ActiveMQ connection is established on startup"""
-        assert hasattr(app.state, 'mq_conn')
-        assert app.state.mq_conn == mock_activemq
+        server_instance.mq_conn = mock_activemq
+        assert server_instance.mq_conn == mock_activemq
         assert mock_activemq.is_connected.return_value is True
     
-    def test_activemq_listener_processes_messages(self):
+    def test_activemq_listener_processes_messages(self, shot_store, connection_manager, parser):
         """Test ActiveMQ listener processes incoming messages"""
-        from main import ActiveMQListener
-        
-        listener = ActiveMQListener()
-        
         mock_loop = MagicMock()
-        listener.loop = mock_loop
+        listener = ActiveMQListener(shot_store, connection_manager, parser, mock_loop)
         
         shot_data = {
             "speed": 150.0,
@@ -39,26 +39,24 @@ class TestActiveMQIntegration:
         mock_frame = MagicMock()
         mock_frame.body = packed_data
         
-        with patch('main.asyncio.run_coroutine_threadsafe') as mock_run_coroutine:
+        with patch('asyncio.run_coroutine_threadsafe') as mock_run_coroutine:
             listener.on_message(mock_frame)
             mock_run_coroutine.assert_called_once()
+            assert listener.message_count == 1
     
-    def test_activemq_error_handling(self):
+    def test_activemq_error_handling(self, shot_store, connection_manager, parser):
         """Test ActiveMQ error handling"""
-        from main import ActiveMQListener
-        
-        listener = ActiveMQListener()
+        listener = ActiveMQListener(shot_store, connection_manager, parser)
         
         mock_frame = MagicMock()
         mock_frame.body = "Error message"
         
         listener.on_error(mock_frame)
+        assert listener.error_count == 1
     
-    def test_activemq_disconnection_handling(self):
+    def test_activemq_disconnection_handling(self, shot_store, connection_manager, parser):
         """Test ActiveMQ disconnection handling"""
-        from main import ActiveMQListener
-        
-        listener = ActiveMQListener()
+        listener = ActiveMQListener(shot_store, connection_manager, parser)
         assert listener.connected is False
         
         listener.on_connected(MagicMock())
@@ -67,27 +65,45 @@ class TestActiveMQIntegration:
         listener.on_disconnected()
         assert listener.connected is False
     
-    def test_malformed_message_handling(self):
+    def test_malformed_message_handling(self, shot_store, connection_manager, parser):
         """Test handling of malformed messages"""
-        from main import ActiveMQListener
-        
-        listener = ActiveMQListener()
+        listener = ActiveMQListener(shot_store, connection_manager, parser)
         
         mock_frame = MagicMock()
         mock_frame.body = b"not valid msgpack data"
         
-        with patch('main.logger') as mock_logger:
+        with patch('listeners.logger') as mock_logger:
             listener.on_message(mock_frame)
             mock_logger.error.assert_called()
     
-    @pytest.mark.asyncio
-    async def test_message_to_websocket_flow(self):
-        """Test complete flow from ActiveMQ message to WebSocket clients"""
-        from main import process_shot_data, websocket_clients
+    def test_base64_encoded_message(self, shot_store, connection_manager, parser):
+        """Test handling of base64 encoded messages"""
+        mock_loop = MagicMock()
+        listener = ActiveMQListener(shot_store, connection_manager, parser, mock_loop)
         
-        mock_ws = MagicMock()
-        mock_ws.send_json = MagicMock(return_value=None)
-        websocket_clients.append(mock_ws)
+        shot_data = {
+            "speed": 150.0,
+            "carry": 270.0,
+            "result_type": 7
+        }
+        
+        packed_data = msgpack.packb(shot_data)
+        base64_data = base64.b64encode(packed_data)
+        
+        mock_frame = MagicMock()
+        mock_frame.body = base64_data
+        mock_frame.headers = {'encoding': 'base64'}
+        
+        with patch('asyncio.run_coroutine_threadsafe') as mock_run_coroutine:
+            listener.on_message(mock_frame)
+            mock_run_coroutine.assert_called_once()
+    
+    @pytest.mark.asyncio
+    async def test_message_to_websocket_flow(self, server_instance, parser):
+        """Test complete flow from ActiveMQ message to WebSocket clients"""
+        mock_ws = AsyncMock()
+        mock_ws.send_json = AsyncMock()
+        server_instance.connection_manager._connections.add(mock_ws)
         
         shot_data = {
             "speed": 175.0,
@@ -101,7 +117,11 @@ class TestActiveMQIntegration:
             "image_paths": ["draw_001.jpg", "draw_002.jpg"]
         }
         
-        await process_shot_data(shot_data)
+        # Process through parser and store
+        current = server_instance.shot_store.get()
+        parsed_shot = parser.parse_dict_format(shot_data, current)
+        server_instance.shot_store.update(parsed_shot)
+        await server_instance.connection_manager.broadcast(parsed_shot.to_dict())
         
         mock_ws.send_json.assert_called_once()
         sent_data = mock_ws.send_json.call_args[0][0]
@@ -114,25 +134,91 @@ class TestActiveMQIntegration:
     
     def test_activemq_config_loading(self, mock_home_dir):
         """Test loading ActiveMQ configuration from config file"""
-        with patch('main.CONFIG_FILE', mock_home_dir / ".pitrac" / "config" / "pitrac.yaml"):
-            with patch('main.stomp.Connection') as mock_conn:
-                from main import setup_activemq
+        with patch('constants.CONFIG_FILE', mock_home_dir / ".pitrac" / "config" / "pitrac.yaml"):
+            with patch('server.stomp.Connection') as mock_conn:
+                from server import PiTracServer
                 
-                conn = setup_activemq()
+                server = PiTracServer()
+                conn = server.setup_activemq()
                 
-                mock_conn.assert_called_with([('localhost', 61613)])
+                # Check connection was attempted with right params
+                mock_conn.assert_called()
+                call_args = mock_conn.call_args[0][0]
+                assert ('localhost', 61613) in call_args
     
-    def test_activemq_reconnection_logic(self, mock_activemq):
+    def test_activemq_reconnection_logic(self, shot_store, connection_manager, parser):
         """Test ActiveMQ reconnection behavior"""
-        from main import ActiveMQListener
-        
-        listener = ActiveMQListener()
+        listener = ActiveMQListener(shot_store, connection_manager, parser)
         
         listener.on_connected(MagicMock())
         assert listener.connected is True
+        assert listener.message_count == 0  # Reset on connect
         
         listener.on_disconnected()
         assert listener.connected is False
         
         listener.on_connected(MagicMock())
         assert listener.connected is True
+    
+    def test_listener_statistics(self, shot_store, connection_manager, parser):
+        """Test listener statistics tracking"""
+        listener = ActiveMQListener(shot_store, connection_manager, parser)
+        
+        # Process some messages
+        for i in range(5):
+            mock_frame = MagicMock()
+            mock_frame.body = msgpack.packb({"speed": 100 + i})
+            listener.on_message(mock_frame)
+        
+        # Generate some errors
+        for i in range(3):
+            listener.on_error(MagicMock(body="error"))
+        
+        stats = listener.get_stats()
+        assert stats["messages_processed"] == 5
+        assert stats["errors"] == 3
+        assert stats["connected"] is False
+    
+    @pytest.mark.asyncio
+    async def test_array_format_processing(self, server_instance, parser):
+        """Test processing of array format messages (C++ MessagePack)"""
+        mock_loop = asyncio.get_event_loop()
+        listener = ActiveMQListener(
+            server_instance.shot_store,
+            server_instance.connection_manager,
+            parser,
+            mock_loop
+        )
+        
+        # Array format from C++
+        shot_data = [
+            250.5,      # carry_meters
+            65.0,       # speed_mpers
+            13.5,       # launch_angle_deg
+            -2.3,       # side_angle_deg
+            3100,       # back_spin_rpm
+            -400,       # side_spin_rpm
+            0.95,       # confidence
+            1,          # club_type
+            7,          # result_type (HIT)
+            "Excellent strike!",  # message
+            []          # log_messages
+        ]
+        
+        packed_data = msgpack.packb(shot_data)
+        
+        mock_frame = MagicMock()
+        mock_frame.body = packed_data
+        
+        with patch('asyncio.run_coroutine_threadsafe') as mock_run:
+            listener.on_message(mock_frame)
+            mock_run.assert_called_once()
+            
+            # Extract the coroutine that was passed
+            coro = mock_run.call_args[0][0]
+            # Run it directly
+            await coro
+            
+            stored = server_instance.shot_store.get()
+            assert stored.carry == 250.5
+            assert abs(stored.speed - 145.4) < 0.1  # m/s to mph conversion

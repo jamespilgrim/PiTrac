@@ -1,0 +1,221 @@
+import asyncio
+import logging
+import subprocess
+from pathlib import Path
+from typing import Any, Dict, Optional, Union
+
+import stomp
+import yaml
+from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect
+from fastapi.responses import FileResponse, HTMLResponse, Response
+from fastapi.staticfiles import StaticFiles
+from fastapi.templating import Jinja2Templates
+
+from constants import (
+    CONFIG_FILE,
+    DEFAULT_BROKER,
+    DEFAULT_PASSWORD,
+    DEFAULT_USERNAME,
+    IMAGES_DIR,
+    STOMP_PORT,
+)
+from listeners import ActiveMQListener
+from managers import ConnectionManager, ShotDataStore
+from parsers import ShotDataParser
+
+logger = logging.getLogger(__name__)
+
+
+class PiTracServer:
+    
+    def __init__(self):
+        self.app = FastAPI(title="PiTrac Dashboard")
+        self.templates = Jinja2Templates(directory="templates")
+        self.connection_manager = ConnectionManager()
+        self.shot_store = ShotDataStore()
+        self.parser = ShotDataParser()
+        self.mq_conn: Optional[stomp.Connection] = None
+        self.listener: Optional[ActiveMQListener] = None
+        
+        IMAGES_DIR.mkdir(parents=True, exist_ok=True)
+        
+        self.app.mount("/static", StaticFiles(directory="static"), name="static")
+        self.app.mount("/images", StaticFiles(directory=str(IMAGES_DIR)), name="images")
+        
+        self._setup_routes()
+        
+        self.app.add_event_handler("startup", self.startup_event)
+        self.app.add_event_handler("shutdown", self.shutdown_event)
+    
+    def _setup_routes(self) -> None:
+        
+        @self.app.get("/", response_class=HTMLResponse)
+        async def dashboard(request: Request) -> Response:
+            return self.templates.TemplateResponse(
+                "dashboard.html",
+                {"request": request, "shot": self.shot_store.get().to_dict()}
+            )
+        
+        @self.app.websocket("/ws")
+        async def websocket_endpoint(websocket: WebSocket) -> None:
+            await self.connection_manager.connect(websocket)
+            
+            await websocket.send_json(self.shot_store.get().to_dict())
+            
+            try:
+                while True:
+                    await websocket.receive_text()
+            except WebSocketDisconnect:
+                self.connection_manager.disconnect(websocket)
+                logger.info("WebSocket client disconnected normally")
+            except Exception as e:
+                logger.error(f"WebSocket error: {e}")
+                self.connection_manager.disconnect(websocket)
+        
+        @self.app.get("/api/shot")
+        async def get_current_shot() -> Dict[str, Any]:
+            return self.shot_store.get().to_dict()
+        
+        @self.app.get("/api/history")
+        async def get_shot_history(limit: int = 10) -> list:
+            return [shot.to_dict() for shot in self.shot_store.get_history(limit)]
+        
+        @self.app.get("/api/images/{filename}", response_model=None)
+        async def get_image(filename: str):
+            image_path = IMAGES_DIR / filename
+            if image_path.exists() and image_path.is_file():
+                return FileResponse(image_path)
+            return {"error": "Image not found"}
+        
+        @self.app.post("/api/reset")
+        async def reset_shot() -> Dict[str, Optional[str]]:
+            shot_data = self.shot_store.reset()
+            await self.connection_manager.broadcast(shot_data.to_dict())
+            logger.info("Shot data reset via API")
+            return {"status": "reset", "timestamp": shot_data.timestamp}
+        
+        @self.app.get("/health")
+        async def health_check() -> Dict[str, Union[str, bool, int, Dict]]:
+            mq_connected = self.mq_conn.is_connected() if self.mq_conn else False
+            
+            pitrac_running = False
+            try:
+                result = subprocess.run(
+                    ["pgrep", "-f", "golf_sim"],
+                    capture_output=True, 
+                    text=True, 
+                    timeout=1
+                )
+                pitrac_running = result.returncode == 0
+            except Exception:
+                pass
+            
+            activemq_running = False
+            try:
+                result = subprocess.run(
+                    ["ss", "-tln"],
+                    capture_output=True, 
+                    text=True, 
+                    timeout=1
+                )
+                activemq_running = (":61616" in result.stdout or ":61613" in result.stdout)
+            except Exception:
+                pass
+            
+            listener_stats = self.listener.get_stats() if self.listener else {}
+            
+            return {
+                "status": "healthy" if mq_connected else "degraded",
+                "activemq_connected": mq_connected,
+                "activemq_running": activemq_running,
+                "pitrac_running": pitrac_running,
+                "websocket_clients": self.connection_manager.connection_count,
+                "listener_stats": listener_stats
+            }
+        
+        @self.app.get("/api/stats")
+        async def get_stats() -> Dict[str, Any]:
+            return {
+                "websocket_connections": self.connection_manager.connection_count,
+                "listener": self.listener.get_stats() if self.listener else None,
+                "shot_history_count": len(self.shot_store.get_history(100))
+            }
+    
+    def _load_config(self) -> Dict[str, Any]:
+        if not CONFIG_FILE.exists():
+            logger.warning(f"Config file not found: {CONFIG_FILE}")
+            return {}
+        
+        try:
+            with open(CONFIG_FILE, 'r') as f:
+                config = yaml.safe_load(f) or {}
+                logger.info(f"Loaded config from {CONFIG_FILE}")
+                return config
+        except Exception as e:
+            logger.error(f"Error loading config: {e}")
+            return {}
+    
+    def setup_activemq(self, loop: Optional[asyncio.AbstractEventLoop] = None) -> Optional[stomp.Connection]:
+        try:
+            config = self._load_config()
+            
+            network_config = config.get("network", {})
+            broker_address = network_config.get("broker_address", DEFAULT_BROKER)
+            username = network_config.get("username", DEFAULT_USERNAME)
+            password = network_config.get("password", DEFAULT_PASSWORD)
+            
+            if broker_address.startswith("tcp://"):
+                broker_address = broker_address[6:]
+            
+            broker_host = broker_address.split(":")[0] if ":" in broker_address else broker_address
+            
+            conn = stomp.Connection([(broker_host, STOMP_PORT)])
+            
+            self.listener = ActiveMQListener(
+                self.shot_store, 
+                self.connection_manager, 
+                self.parser,
+                loop
+            )
+            conn.set_listener('', self.listener)
+            
+            conn.connect(username, password, wait=True)
+            conn.subscribe(destination='/topic/Golf.Sim', id=1, ack='auto')
+            
+            logger.info(f"Connected to ActiveMQ at {broker_host}:{STOMP_PORT}")
+            return conn
+            
+        except stomp.exception.ConnectFailedException as e:
+            logger.error(f"Failed to connect to ActiveMQ broker: {e}")
+            return None
+        except Exception as e:
+            logger.error(f"Unexpected error connecting to ActiveMQ: {e}", exc_info=True)
+            return None
+    
+    async def startup_event(self) -> None:
+        logger.info("Starting PiTrac Web Server...")
+        loop = asyncio.get_event_loop()
+        self.mq_conn = self.setup_activemq(loop)
+        
+        if not self.mq_conn:
+            logger.warning("Running without ActiveMQ connection - shots won't be received")
+    
+    async def shutdown_event(self) -> None:
+        logger.info("Shutting down PiTrac Web Server...")
+        
+        if self.mq_conn:
+            try:
+                self.mq_conn.disconnect()
+                logger.info("Disconnected from ActiveMQ")
+            except Exception as e:
+                logger.error(f"Error disconnecting from ActiveMQ: {e}")
+        
+        for ws in self.connection_manager.connections:
+            try:
+                await ws.close()
+            except Exception:
+                pass
+
+
+server = PiTracServer()
+app = server.app

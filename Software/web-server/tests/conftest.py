@@ -4,7 +4,7 @@ import os
 import sys
 from pathlib import Path
 from typing import AsyncGenerator, Generator
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock, patch, AsyncMock
 
 import pytest
 from fastapi.testclient import TestClient
@@ -15,11 +15,16 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 # Set test environment
 os.environ["TESTING"] = "true"
 
+from models import ShotData
+from managers import ConnectionManager, ShotDataStore
+from parsers import ShotDataParser
+from server import PiTracServer
+
 
 @pytest.fixture
 def mock_activemq():
     """Mock ActiveMQ connection"""
-    with patch('main.stomp.Connection') as mock_conn:
+    with patch('server.stomp.Connection') as mock_conn:
         mock_instance = MagicMock()
         mock_conn.return_value = mock_instance
         mock_instance.is_connected.return_value = True
@@ -27,14 +32,16 @@ def mock_activemq():
 
 
 @pytest.fixture
-def app(mock_activemq):
-    """Create FastAPI app instance with mocked dependencies"""
-    from main import app as _app
-    
-    # Mock the ActiveMQ connection in app state
-    _app.state.mq_conn = mock_activemq
-    
-    return _app
+def server_instance(mock_activemq):
+    """Create PiTracServer instance with mocked dependencies"""
+    server = PiTracServer()
+    server.mq_conn = mock_activemq
+    return server
+
+
+@pytest.fixture
+def app(server_instance):
+    return server_instance.app
 
 
 @pytest.fixture
@@ -67,6 +74,23 @@ def sample_shot_data():
 
 
 @pytest.fixture
+def shot_data_instance():
+    """Create a ShotData instance for testing"""
+    return ShotData(
+        speed=145.5,
+        carry=265.3,
+        launch_angle=12.4,
+        side_angle=-2.1,
+        back_spin=2850,
+        side_spin=-320,
+        result_type="Hit",
+        message="Great shot!",
+        timestamp="2024-01-01T12:00:00",
+        images=["shot_001.jpg", "shot_002.jpg"]
+    )
+
+
+@pytest.fixture
 def mock_home_dir(tmp_path):
     """Mock home directory for testing"""
     home = tmp_path / "home"
@@ -78,8 +102,9 @@ def mock_home_dir(tmp_path):
     # Create a test config file
     config = {
         "network": {
-            "broker_host": "localhost",
-            "broker_port": 61613
+            "broker_address": "tcp://localhost:61616",
+            "username": "test_user",
+            "password": "test_pass"
         }
     }
     
@@ -88,18 +113,41 @@ def mock_home_dir(tmp_path):
     with open(config_file, 'w') as f:
         yaml.dump(config, f)
     
-    with patch('main.Path.home', return_value=home):
-        yield home
+    with patch('constants.Path.home', return_value=home):
+        with patch('constants.HOME_DIR', home):
+            with patch('constants.PITRAC_DIR', home / ".pitrac"):
+                with patch('constants.IMAGES_DIR', home / "LM_Shares" / "Images"):
+                    with patch('constants.CONFIG_FILE', config_file):
+                        yield home
 
 
 @pytest.fixture
 def mock_websocket():
     """Mock WebSocket for testing"""
-    ws = MagicMock()
-    ws.accept = MagicMock(return_value=asyncio.coroutine(lambda: None)())
-    ws.send_json = MagicMock(return_value=asyncio.coroutine(lambda: None)())
-    ws.receive_text = MagicMock(side_effect=asyncio.TimeoutError)
+    ws = AsyncMock()
+    ws.accept = AsyncMock()
+    ws.send_json = AsyncMock()
+    ws.receive_text = AsyncMock(side_effect=asyncio.TimeoutError)
+    ws.close = AsyncMock()
     return ws
+
+
+@pytest.fixture
+def connection_manager():
+    """Create ConnectionManager instance for testing"""
+    return ConnectionManager()
+
+
+@pytest.fixture
+def shot_store():
+    """Create ShotDataStore instance for testing"""
+    return ShotDataStore()
+
+
+@pytest.fixture
+def parser():
+    """Create ShotDataParser instance for testing"""
+    return ShotDataParser()
 
 
 @pytest.fixture
@@ -139,33 +187,41 @@ def shot_simulator():
         def generate_sequence(count=10):
             """Generate a sequence of shots"""
             return [ShotSimulator.generate_shot() for _ in range(count)]
+        
+        @staticmethod
+        def generate_array_format():
+            """Generate shot data in array format (C++ MessagePack format)"""
+            import random
+            return [
+                round(random.uniform(150, 350), 1),  # carry_meters
+                round(random.uniform(44.7, 80.5), 1),  # speed_mpers (100-180 mph)
+                round(random.uniform(8, 20), 1),  # launch_angle_deg
+                round(random.uniform(-5, 5), 1),  # side_angle_deg
+                random.randint(1500, 4000),  # back_spin_rpm
+                random.randint(-1000, 1000),  # side_spin_rpm
+                0.95,  # confidence
+                1,  # club_type
+                7,  # result_type (HIT)
+                "Great shot!",  # message
+                []  # log_messages
+            ]
     
     return ShotSimulator()
 
 
 @pytest.fixture(autouse=True)
-def reset_singleton_state():
+def reset_singleton_state(server_instance):
     """Reset any singleton state between tests"""
-    # Reset current_shot data
-    from main import current_shot, websocket_clients
+    # Reset shot store
+    server_instance.shot_store.reset()
+    server_instance.shot_store.clear_history()
     
-    current_shot.clear()
-    current_shot.update({
-        "speed": 0.0,
-        "carry": 0.0,
-        "launch_angle": 0.0,
-        "side_angle": 0.0,
-        "back_spin": 0,
-        "side_spin": 0,
-        "result_type": "Waiting for ball...",
-        "message": "",
-        "timestamp": None,
-        "images": []
-    })
-    
-    websocket_clients.clear()
+    # Clear websocket connections
+    server_instance.connection_manager._connections.clear()
     
     yield
     
-    current_shot.clear()
-    websocket_clients.clear()
+    # Cleanup after test
+    server_instance.shot_store.reset()
+    server_instance.shot_store.clear_history()
+    server_instance.connection_manager._connections.clear()

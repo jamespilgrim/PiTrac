@@ -2,8 +2,10 @@ import asyncio
 import json
 import time
 import pytest
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch, MagicMock, AsyncMock
 import msgpack
+from models import ShotData, ResultType
+from parsers import ShotDataParser
 
 
 @pytest.mark.integration
@@ -11,30 +13,35 @@ class TestShotSimulation:
     """Test realistic shot simulation scenarios"""
     
     @pytest.mark.asyncio
-    async def test_rapid_shot_sequence(self, app, shot_simulator):
+    async def test_rapid_shot_sequence(self, server_instance, parser, shot_simulator):
         """Test handling rapid sequence of shots"""
-        from main import process_shot_data, current_shot
-        
         shots = shot_simulator.generate_sequence(10)
         
         for shot in shots:
-            await process_shot_data(shot)
-            assert current_shot["speed"] == shot["speed"]
-            assert current_shot["carry"] == shot["carry"]
+            current = server_instance.shot_store.get()
+            parsed_shot = parser.parse_dict_format(shot, current)
+            server_instance.shot_store.update(parsed_shot)
+            
+            stored_shot = server_instance.shot_store.get()
+            assert stored_shot.speed == shot["speed"]
+            assert stored_shot.carry == shot["carry"]
             await asyncio.sleep(0.01)
     
     @pytest.mark.asyncio
-    async def test_concurrent_shot_updates(self, app, shot_simulator):
+    async def test_concurrent_shot_updates(self, server_instance, parser, shot_simulator):
         """Test handling concurrent shot updates"""
-        from main import process_shot_data
-        
         shots = shot_simulator.generate_sequence(5)
         
-        tasks = [process_shot_data(shot) for shot in shots]
+        async def update_shot(shot_data):
+            current = server_instance.shot_store.get()
+            parsed_shot = parser.parse_dict_format(shot_data, current)
+            server_instance.shot_store.update(parsed_shot)
+        
+        tasks = [update_shot(shot) for shot in shots]
         await asyncio.gather(*tasks)
         
-        from main import current_shot
-        assert current_shot["speed"] > 0
+        stored_shot = server_instance.shot_store.get()
+        assert stored_shot.speed > 0
     
     def test_shot_data_validation(self, shot_simulator):
         """Test shot data validation and bounds"""
@@ -48,10 +55,8 @@ class TestShotSimulation:
         assert -1000 <= shot["side_spin"] <= 1000
     
     @pytest.mark.asyncio
-    async def test_shot_with_images(self, app, tmp_path):
+    async def test_shot_with_images(self, server_instance, parser, tmp_path):
         """Test shot processing with image handling"""
-        from main import process_shot_data, current_shot
-        
         image_files = []
         for i in range(3):
             img_path = tmp_path / f"shot_{i}.jpg"
@@ -70,30 +75,32 @@ class TestShotSimulation:
             "image_paths": image_files
         }
         
-        with patch('main.IMAGES_DIR', tmp_path):
-            await process_shot_data(shot_data)
+        with patch('constants.IMAGES_DIR', tmp_path):
+            current = server_instance.shot_store.get()
+            parsed_shot = parser.parse_dict_format(shot_data, current)
+            server_instance.shot_store.update(parsed_shot)
             
-            assert current_shot["images"] == image_files
-            assert len(current_shot["images"]) == 3
+            stored_shot = server_instance.shot_store.get()
+            assert stored_shot.images == image_files
+            assert len(stored_shot.images) == 3
     
     @pytest.mark.slow
     @pytest.mark.asyncio
-    async def test_sustained_shot_stream(self, app, shot_simulator):
+    async def test_sustained_shot_stream(self, server_instance, parser, shot_simulator):
         """Test sustained stream of shots over time"""
-        from main import process_shot_data, websocket_clients
-        
-        mock_ws = MagicMock()
-        async def mock_send_json(*args, **kwargs):
-            return None
-        mock_ws.send_json = MagicMock(side_effect=mock_send_json)
-        websocket_clients.append(mock_ws)
+        mock_ws = AsyncMock()
+        mock_ws.send_json = AsyncMock()
+        server_instance.connection_manager._connections.add(mock_ws)
         
         start_time = time.time()
         shot_count = 0
         
         while time.time() - start_time < 2:
             shot = shot_simulator.generate_shot()
-            await process_shot_data(shot)
+            current = server_instance.shot_store.get()
+            parsed_shot = parser.parse_dict_format(shot, current)
+            server_instance.shot_store.update(parsed_shot)
+            await server_instance.connection_manager.broadcast(parsed_shot.to_dict())
             shot_count += 1
             await asyncio.sleep(0.1)
         
@@ -102,8 +109,6 @@ class TestShotSimulation:
     
     def test_shot_result_types(self):
         """Test different shot result types"""
-        from main import ResultType
-        
         result_types = {
             ResultType.UNKNOWN: "Unknown",
             ResultType.INITIALIZING: "Initializing",
@@ -118,37 +123,41 @@ class TestShotSimulation:
             assert formatted == expected_text or formatted.replace(" ", "") == expected_text.replace(" ", "")
     
     @pytest.mark.asyncio
-    async def test_shot_timestamp_generation(self, app, shot_simulator):
+    async def test_shot_timestamp_generation(self, server_instance, parser, shot_simulator):
         """Test that timestamps are properly generated"""
-        from main import process_shot_data, current_shot
         from datetime import datetime
         
         shot = shot_simulator.generate_shot()
         
         before = datetime.now()
-        await process_shot_data(shot)
+        current = server_instance.shot_store.get()
+        parsed_shot = parser.parse_dict_format(shot, current)
+        server_instance.shot_store.update(parsed_shot)
         after = datetime.now()
         
-        assert current_shot["timestamp"] is not None
+        stored_shot = server_instance.shot_store.get()
+        assert stored_shot.timestamp is not None
         
-        timestamp = datetime.fromisoformat(current_shot["timestamp"])
+        timestamp = datetime.fromisoformat(stored_shot.timestamp)
         assert before <= timestamp <= after
     
     @pytest.mark.asyncio
-    async def test_shot_data_persistence(self, app, shot_simulator):
+    async def test_shot_data_persistence(self, server_instance, parser, shot_simulator):
         """Test that shot data persists between requests"""
-        from main import process_shot_data, current_shot
-        
         shot = shot_simulator.generate_shot()
-        await process_shot_data(shot)
+        current = server_instance.shot_store.get()
+        parsed_shot = parser.parse_dict_format(shot, current)
+        server_instance.shot_store.update(parsed_shot)
         
-        stored_speed = current_shot["speed"]
-        stored_carry = current_shot["carry"]
+        stored_shot = server_instance.shot_store.get()
+        stored_speed = stored_shot.speed
+        stored_carry = stored_shot.carry
         
         await asyncio.sleep(0.1)
         
-        assert current_shot["speed"] == stored_speed
-        assert current_shot["carry"] == stored_carry
+        current_shot = server_instance.shot_store.get()
+        assert current_shot.speed == stored_speed
+        assert current_shot.carry == stored_carry
     
     @pytest.mark.parametrize("club_type,speed_range,carry_range", [
         ("driver", (140, 180), (250, 350)),
@@ -164,3 +173,39 @@ class TestShotSimulation:
         
         assert speed_range[0] <= shot["speed"] <= speed_range[1]
         assert carry_range[0] <= shot["carry"] <= carry_range[1]
+    
+    def test_parser_validation(self, parser):
+        """Test parser validation of shot data"""
+        valid_shot = ShotData(
+            speed=150.0,
+            carry=250.0,
+            launch_angle=15.0,
+            side_angle=2.0,
+            back_spin=3000,
+            side_spin=200
+        )
+        assert parser.validate_shot_data(valid_shot) is True
+        
+        invalid_shot = ShotData(speed=500.0)
+        assert parser.validate_shot_data(invalid_shot) is False
+        
+        invalid_shot = ShotData(launch_angle=100.0)
+        assert parser.validate_shot_data(invalid_shot) is False
+    
+    @pytest.mark.asyncio
+    async def test_shot_history(self, server_instance, shot_simulator):
+        """Test shot history tracking"""
+        for i in range(5):
+            shot = ShotData(
+                speed=100 + i*10,
+                carry=200 + i*20,
+                result_type="Hit"  # Only "Hit" shots are stored in history
+            )
+            server_instance.shot_store.update(shot)
+        
+        history = server_instance.shot_store.get_history(10)
+        assert len(history) == 5
+        
+        for i, shot in enumerate(history):
+            assert shot.speed == 100 + i*10
+            assert shot.carry == 200 + i*20
