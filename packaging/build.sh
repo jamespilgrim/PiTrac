@@ -715,7 +715,7 @@ EOF
     echo ""
     echo "Web server status:"
     if systemctl is-active --quiet pitrac-web.service; then
-        echo "  Service is running. Access at http://$(hostname -I | cut -d' ' -f1):5000"
+        echo "  Service is running. Access at http://$(hostname -I | cut -d' ' -f1):8080"
     else
         echo "  Service is not running. Start with: sudo systemctl start pitrac-web.service"
     fi
