@@ -135,10 +135,6 @@ namespace golf_sim {
         results.image_file_paths_.clear();
         
         results.image_file_paths_.push_back(kWebServerResultBallExposureCandidates + ".png");  // Shows ball trajectory
-        results.image_file_paths_.push_back("log_cam2_last_strobed_img.png");  // Raw strobed shot image
-        
-        results.image_file_paths_.push_back(kWebServerResultSpinBall1Image + ".png");  // Ball position 1 for spin
-        results.image_file_paths_.push_back(kWebServerResultSpinBall2Image + ".png");  // Ball position 2 for spin
         results.image_file_paths_.push_back(kWebServerResultBallRotatedByBestAngles + ".png");  // Rotation analysis result
 
         GS_LOG_MSG(info, "BALL_HIT_CSV, " + std::to_string(GsSimInterface::GetShotCounter()) + ", (carry - NA), (Total - NA), (Side Dest - NA), (Smash Factor - NA), (Club Speed - NA), "

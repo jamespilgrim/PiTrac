@@ -94,6 +94,12 @@ body {
     flex: 1;
 }
 
+.header-right {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
 .header-logo {
     height: 3.5rem;
     width: auto;
@@ -153,31 +159,19 @@ body {
     height: 1.25rem;
 }
 
-/* Status Bar */
-.status-bar {
-    background: var(--bg-card);
-    border-radius: 0.75rem;
-    padding: 1rem 1.5rem;
-    margin-bottom: 1.5rem;
+/* Vertical Status Indicators */
+.status-indicators-vertical {
     display: flex;
-    justify-content: space-between;
-    align-items: center;
-    box-shadow: var(--shadow-sm);
-    flex-wrap: wrap;
-    gap: 1rem;
-}
-
-.status-indicators {
-    display: flex;
-    gap: 1.5rem;
-    align-items: center;
+    flex-direction: column;
+    gap: 0.75rem;
+    padding-right: 1rem;
+    border-right: 2px solid var(--border-color);
 }
 
 .status-indicator {
     display: flex;
     align-items: center;
-    gap: 0.5rem;
-    font-size: 0.9rem;
+    gap: 0.4rem;
 }
 
 .status-dot {
@@ -185,17 +179,28 @@ body {
     height: 0.75rem;
     border-radius: 50%;
     background: var(--success);
-    animation: pulse 2s infinite;
+    transition: all 0.3s ease;
+    box-shadow: 0 0 6px var(--success);
+    cursor: help;
 }
 
 .status-dot.disconnected {
     background: var(--error);
-    animation: none;
+    box-shadow: 0 0 6px var(--error);
+    animation: pulse 2s infinite;
+}
+
+.status-label {
+    font-size: 0.7rem;
+    font-weight: 600;
+    color: var(--text-muted);
+    letter-spacing: 0.05em;
 }
 
 #timestamp {
+    font-size: 0.75rem;
     color: var(--text-muted);
-    font-size: 0.875rem;
+    white-space: nowrap;
 }
 
 /* Metrics Grid */
@@ -470,6 +475,110 @@ body {
     outline-offset: 2px;
 }
 
+/* Ball Ready Indicator */
+.ball-ready-indicator {
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
+    padding: 1.5rem;
+    margin-bottom: 2rem;
+    background: var(--bg-card);
+    border-radius: 1rem;
+    box-shadow: var(--shadow-lg);
+    transition: all 0.3s ease;
+}
+
+.ball-status-icon {
+    width: 80px;
+    height: 80px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.3s ease;
+}
+
+.ball-icon {
+    width: 100%;
+    height: 100%;
+    color: var(--text-muted);
+    transition: all 0.3s ease;
+}
+
+.ball-status-text {
+    flex: 1;
+}
+
+.ball-status-title {
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 0.5rem;
+}
+
+.ball-status-message {
+    font-size: 1rem;
+    color: var(--text-secondary);
+}
+
+/* Ball Status States */
+.ball-ready-indicator.initializing {
+    border-left: 4px solid var(--info);
+}
+
+.ball-ready-indicator.initializing .ball-icon {
+    color: var(--info);
+    animation: pulse 2s infinite;
+}
+
+.ball-ready-indicator.waiting {
+    border-left: 4px solid var(--warning);
+}
+
+.ball-ready-indicator.waiting .ball-icon {
+    color: var(--warning);
+    animation: pulse 2s infinite;
+}
+
+.ball-ready-indicator.stabilizing {
+    border-left: 4px solid #fbbf24;
+}
+
+.ball-ready-indicator.stabilizing .ball-icon {
+    color: #fbbf24;
+    animation: bounce 1s infinite;
+}
+
+.ball-ready-indicator.ready {
+    border-left: 4px solid var(--success);
+    background: linear-gradient(135deg, var(--bg-card) 0%, rgba(72, 187, 120, 0.1) 100%);
+}
+
+.ball-ready-indicator.ready .ball-icon {
+    color: var(--success);
+    transform: scale(1.1);
+}
+
+.ball-ready-indicator.ready .ball-status-title {
+    color: var(--success);
+}
+
+.ball-ready-indicator.hit {
+    border-left: 4px solid var(--accent-primary);
+}
+
+.ball-ready-indicator.hit .ball-icon {
+    color: var(--accent-primary);
+    animation: none;
+}
+
+.ball-ready-indicator.error {
+    border-left: 4px solid var(--error);
+}
+
+.ball-ready-indicator.error .ball-icon {
+    color: var(--error);
+}
+
 @media print {
     body {
         background: white;
@@ -477,7 +586,7 @@ body {
     }
 
     .controls,
-    .status-bar,
+    .status-indicators-vertical,
     .theme-toggle {
         display: none;
     }

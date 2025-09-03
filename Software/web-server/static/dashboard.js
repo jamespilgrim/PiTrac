@@ -49,7 +49,6 @@ function connectWebSocket() {
     ws.onopen = () => {
         console.log('WebSocket connected');
         document.getElementById('ws-status-dot').classList.remove('disconnected');
-        document.getElementById('ws-status-text').textContent = 'WebSocket';
     };
 
     ws.onmessage = (event) => {
@@ -60,7 +59,6 @@ function connectWebSocket() {
     ws.onclose = () => {
         console.log('WebSocket disconnected');
         document.getElementById('ws-status-dot').classList.add('disconnected');
-        document.getElementById('ws-status-text').textContent = 'WebSocket';
         setTimeout(connectWebSocket, 3000);
     };
 
@@ -92,17 +90,74 @@ function updateDisplay(data) {
     document.getElementById('result_type').textContent = data.result_type || 'Waiting...';
     document.getElementById('message').textContent = data.message || '';
 
+    // Update ball ready status indicator
+    updateBallStatus(data.result_type, data.message);
+
     if (data.timestamp) {
         const date = new Date(data.timestamp);
-        document.getElementById('timestamp').textContent =
-            `Last update: ${date.toLocaleTimeString()}`;
+        document.getElementById('timestamp').textContent = date.toLocaleTimeString();
     }
 
-    if (data.images && data.images.length > 0) {
-        const imageGrid = document.getElementById('image-grid');
+    // Update images - only show images for actual hits, clear for status messages
+    const imageGrid = document.getElementById('image-grid');
+    const resultType = (data.result_type || '').toLowerCase();
+    
+    // Only show images for hit results
+    if (resultType.includes('hit') && data.images && data.images.length > 0) {
         imageGrid.innerHTML = data.images.map((img, idx) =>
             `<img src="/images/${img}" alt="Shot ${idx + 1}" class="shot-image" loading="lazy" onclick="openImage('${img}')">`
         ).join('');
+    } else if (!resultType.includes('hit')) {
+        imageGrid.innerHTML = '';
+    }
+}
+
+function updateBallStatus(resultType, message) {
+    const indicator = document.getElementById('ball-ready-indicator');
+    const statusTitle = document.getElementById('ball-status-title');
+    const statusMessage = document.getElementById('ball-status-message');
+    
+    indicator.classList.remove('initializing', 'waiting', 'stabilizing', 'ready', 'hit', 'error');
+    
+    if (resultType) {
+        const normalizedType = resultType.toLowerCase();
+        
+        if (normalizedType.includes('initializing')) {
+            indicator.classList.add('initializing');
+            statusTitle.textContent = 'System Initializing';
+            statusMessage.textContent = message || 'Starting up PiTrac system...';
+        } else if (normalizedType.includes('waiting for ball')) {
+            indicator.classList.add('waiting');
+            statusTitle.textContent = 'Waiting for Ball';
+            statusMessage.textContent = message || 'Please place ball on tee';
+        } else if (normalizedType.includes('waiting for simulator')) {
+            indicator.classList.add('waiting');
+            statusTitle.textContent = 'Waiting for Simulator';
+            statusMessage.textContent = message || 'Waiting for simulator to be ready';
+        } else if (normalizedType.includes('pausing') || normalizedType.includes('stabilization')) {
+            indicator.classList.add('stabilizing');
+            statusTitle.textContent = 'Ball Detected';
+            statusMessage.textContent = message || 'Waiting for ball to stabilize...';
+        } else if (normalizedType.includes('ball ready') || normalizedType.includes('ready')) {
+            indicator.classList.add('ready');
+            statusTitle.textContent = 'Ready to Hit!';
+            statusMessage.textContent = message || 'Ball is ready - take your shot!';
+        } else if (normalizedType.includes('hit')) {
+            indicator.classList.add('hit');
+            statusTitle.textContent = 'Ball Hit!';
+            statusMessage.textContent = message || 'Processing shot data...';
+        } else if (normalizedType.includes('error')) {
+            indicator.classList.add('error');
+            statusTitle.textContent = 'Error';
+            statusMessage.textContent = message || 'An error occurred';
+        } else if (normalizedType.includes('multiple balls')) {
+            indicator.classList.add('error');
+            statusTitle.textContent = 'Multiple Balls Detected';
+            statusMessage.textContent = message || 'Please remove extra balls';
+        } else {
+            statusTitle.textContent = 'System Status';
+            statusMessage.textContent = message || resultType;
+        }
     }
 }
 
@@ -128,26 +183,17 @@ async function checkSystemStatus() {
             const data = await response.json();
 
             const mqDot = document.getElementById('mq-status-dot');
-            const mqText = document.getElementById('mq-status-text');
             if (data.activemq_connected) {
                 mqDot.classList.remove('disconnected');
-                mqText.textContent = 'ActiveMQ';
-            } else if (data.activemq_running) {
-                mqDot.classList.add('disconnected');
-                mqText.textContent = 'ActiveMQ';
             } else {
                 mqDot.classList.add('disconnected');
-                mqText.textContent = 'ActiveMQ';
             }
 
             const pitracDot = document.getElementById('pitrac-status-dot');
-            const pitracText = document.getElementById('pitrac-status-text');
             if (data.pitrac_running) {
                 pitracDot.classList.remove('disconnected');
-                pitracText.textContent = 'PiTrac';
             } else {
                 pitracDot.classList.add('disconnected');
-                pitracText.textContent = 'PiTrac';
             }
         }
     } catch (error) {
@@ -161,6 +207,10 @@ document.addEventListener('DOMContentLoaded', () => {
     checkSystemStatus();
 
     setInterval(checkSystemStatus, 5000);
+
+    const currentResultType = document.getElementById('result_type').textContent;
+    const currentMessage = document.getElementById('message').textContent;
+    updateBallStatus(currentResultType, currentMessage);
 
     document.addEventListener('visibilitychange', () => {
         if (!document.hidden && (!ws || ws.readyState !== WebSocket.OPEN)) {
