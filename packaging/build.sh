@@ -198,6 +198,11 @@ clean_all() {
 build_dev() {
     log_info "PiTrac Development Build - Direct Pi Installation"
 
+    # Source common functions
+    if [[ -f "$SCRIPT_DIR/src/lib/pitrac-common-functions.sh" ]]; then
+        source "$SCRIPT_DIR/src/lib/pitrac-common-functions.sh"
+    fi
+
     # Check if running on Raspberry Pi
     if ! grep -q "Raspberry Pi" /proc/cpuinfo 2>/dev/null; then
         log_error "Dev mode must be run on a Raspberry Pi"
@@ -312,31 +317,10 @@ build_dev() {
         apt-get install -y "${missing_deps[@]}"
     fi
 
-    # Extract dependencies to system locations (skip if already present)
-    log_info "Checking pre-built dependencies..."
+    log_info "Extracting pre-built dependencies..."
     mkdir -p /usr/lib/pitrac
-
-    # Check and extract OpenCV if needed
-    if [[ ! -f /usr/lib/pitrac/libopencv_core.so.4.11.0 ]]; then
-        log_info "  Extracting OpenCV 4.11.0..."
-        tar xzf "$ARTIFACT_DIR/opencv-4.11.0-arm64.tar.gz" -C /tmp/
-        cp -r /tmp/opencv/lib/*.so* /usr/lib/pitrac/ 2>/dev/null || true
-        rm -rf /tmp/opencv
-    else
-        log_info "  OpenCV 4.11.0 already installed"
-    fi
-
-    # Check and extract ActiveMQ if needed
-    if [[ ! -f /usr/lib/pitrac/libactivemq-cpp.so ]]; then
-        log_info "  Extracting ActiveMQ-CPP 3.9.5..."
-        tar xzf "$ARTIFACT_DIR/activemq-cpp-3.9.5-arm64.tar.gz" -C /tmp/
-        cp -r /tmp/activemq-cpp/lib/*.so* /usr/lib/pitrac/ 2>/dev/null || true
-        rm -rf /tmp/activemq-cpp
-    else
-        log_info "  ActiveMQ-CPP 3.9.5 already installed"
-    fi
-
-    # Check and extract ActiveMQ headers for building (always needed)
+    extract_all_dependencies "$ARTIFACT_DIR" "/usr/lib/pitrac"
+    
     if [[ ! -d /opt/activemq-cpp/include ]]; then
         log_info "  Setting up ActiveMQ headers..."
         tar xzf "$ARTIFACT_DIR/activemq-cpp-3.9.5-arm64.tar.gz" -C /tmp/
@@ -345,25 +329,6 @@ build_dev() {
         rm -rf /tmp/activemq-cpp
     fi
 
-    # Check and extract lgpio if needed
-    if [[ ! -f /usr/lib/pitrac/liblgpio.so ]]; then
-        log_info "  Extracting lgpio 0.2.2..."
-        tar xzf "$ARTIFACT_DIR/lgpio-0.2.2-arm64.tar.gz" -C /tmp/
-        cp -r /tmp/lgpio/lib/*.so* /usr/lib/pitrac/ 2>/dev/null || true
-        rm -rf /tmp/lgpio
-    else
-        log_info "  lgpio 0.2.2 already installed"
-    fi
-
-    # Extract msgpack if it has libraries
-    log_info "  Checking msgpack-cxx 6.1.1..."
-    tar xzf "$ARTIFACT_DIR/msgpack-cxx-6.1.1-arm64.tar.gz" -C /tmp/
-    if [[ -d /tmp/msgpack/lib ]]; then
-        cp -r /tmp/msgpack/lib/*.so* /usr/lib/pitrac/ 2>/dev/null || true
-    fi
-    rm -rf /tmp/msgpack
-
-    # Check and extract OpenCV headers for building (always needed)
     if [[ ! -d /opt/opencv/include/opencv4 ]]; then
         log_info "  Setting up OpenCV headers..."
         tar xzf "$ARTIFACT_DIR/opencv-4.11.0-arm64.tar.gz" -C /tmp/
@@ -377,70 +342,18 @@ build_dev() {
     # Update library cache
     ldconfig
 
-    # Configure libcamera using existing example.yaml files
-    log_info "Setting up libcamera configuration..."
+    # Configure libcamera using common function
+    configure_libcamera
 
-    for pipeline in pisp vc4; do
-        config_dir="/usr/share/libcamera/pipeline/rpi/${pipeline}"
-        example_file="${config_dir}/example.yaml"
-        config_file="${config_dir}/rpi_apps.yaml"
-
-        if [[ -d "$config_dir" ]] && [[ -f "$example_file" ]] && [[ ! -f "$config_file" ]]; then
-            log_info "Creating ${pipeline} config from example..."
-            # Copy example and uncomment/set the camera timeout
-            cp "$example_file" "$config_file"
-            # Uncomment the camera_timeout_value_ms line and set to 1000000
-            sed -i 's/# *"camera_timeout_value_ms": *[0-9]*/"camera_timeout_value_ms": 1000000/' "$config_file"
-            log_success "Created ${config_file} with extended timeout"
-        elif [[ -f "$config_file" ]]; then
-            log_info "  ${pipeline} config already exists"
-        fi
-    done
-
-    # Create pkg-config files for libraries that don't have them
-    mkdir -p /usr/lib/pkgconfig
-
-    # Create lgpio.pc if it doesn't exist
-    if [[ ! -f /usr/lib/pkgconfig/lgpio.pc ]]; then
-        log_info "Creating lgpio.pc pkg-config file..."
-        cat > /usr/lib/pkgconfig/lgpio.pc << 'EOF'
-prefix=/usr
-exec_prefix=${prefix}
-libdir=${exec_prefix}/lib/aarch64-linux-gnu
-includedir=${prefix}/include
-
-Name: lgpio
-Description: GPIO library for Linux
-Version: 0.2.2
-Libs: -L${libdir} -llgpio
-Cflags: -I${includedir}
-EOF
-    fi
-
-    # Create msgpack-cxx.pc if it doesn't exist
-    if [[ ! -f /usr/lib/pkgconfig/msgpack-cxx.pc ]]; then
-        log_info "Creating msgpack-cxx.pc pkg-config file..."
-        cat > /usr/lib/pkgconfig/msgpack-cxx.pc << 'EOF'
-prefix=/usr
-exec_prefix=${prefix}
-includedir=${prefix}/include
-
-Name: msgpack-cxx
-Description: MessagePack implementation for C++
-Version: 4.1.3
-Cflags: -I${includedir}
-EOF
-    fi
+    # Create pkg-config files using common function
+    create_pkgconfig_files
 
     # Build PiTrac
     log_info "Building PiTrac..."
     cd "$REPO_ROOT/Software/LMSourceCode/ImageProcessing"
 
-    # Apply Boost C++20 fix if needed
-    if ! grep -q "#include <utility>" /usr/include/boost/asio/awaitable.hpp 2>/dev/null; then
-        log_info "Applying Boost C++20 compatibility fix..."
-        sed -i '/namespace boost {/i #include <utility>' /usr/include/boost/asio/awaitable.hpp
-    fi
+    # Apply Boost C++20 fix using common function
+    apply_boost_cxx20_fix
 
     # Set build environment
     export PKG_CONFIG_PATH="/opt/opencv/lib/pkgconfig:/opt/activemq-cpp/lib/pkgconfig:/usr/lib/pkgconfig:/usr/share/pkgconfig:/usr/lib/aarch64-linux-gnu/pkgconfig"
@@ -487,29 +400,10 @@ EOF
     log_info "Installing CLI tool..."
     install -m 755 "$SCRIPT_DIR/pitrac" /usr/bin/pitrac
 
-    # Install camera tools
-    log_info "Installing camera tools..."
-    if [[ -d "$REPO_ROOT/Software/LMSourceCode/ImageProcessing/CameraTools" ]]; then
-        mkdir -p /usr/lib/pitrac/ImageProcessing/CameraTools
-        cp -r "$REPO_ROOT/Software/LMSourceCode/ImageProcessing/CameraTools"/* \
-           /usr/lib/pitrac/ImageProcessing/CameraTools/
-        find /usr/lib/pitrac/ImageProcessing/CameraTools -name "*.sh" -type f -exec chmod 755 {} \;
-    fi
 
-    # Install test images
-    log_info "Installing test images..."
-    mkdir -p /usr/share/pitrac/test-images
-    local test_images_dir="$REPO_ROOT/Software/LMSourceCode/Images"
-    if [[ -d "$test_images_dir" ]]; then
-        if [[ -f "$test_images_dir/gs_log_img__log_ball_final_found_ball_img.png" ]]; then
-            cp "$test_images_dir/gs_log_img__log_ball_final_found_ball_img.png" \
-               /usr/share/pitrac/test-images/teed-ball.png
-        fi
-        if [[ -f "$test_images_dir/log_cam2_last_strobed_img.png" ]]; then
-            cp "$test_images_dir/log_cam2_last_strobed_img.png" \
-               /usr/share/pitrac/test-images/strobed.png
-        fi
-    fi
+    install_camera_tools "/usr/lib/pitrac" "$REPO_ROOT"
+
+    install_test_images "/usr/share/pitrac/test-images" "$REPO_ROOT"
 
     # Install calibration tools
     log_info "Installing calibration tools..."
@@ -570,12 +464,21 @@ EOF
             log_success "ActiveMQ configuration installed successfully"
             
             log_info "Restarting ActiveMQ service..."
-            systemctl restart activemq
-            systemctl enable activemq
+            # First enable the service (for boot)
+            systemctl enable activemq 2>/dev/null || true
             
-            sleep 2
+
+            manage_service_restart "activemq"
+            
             if systemctl is-active --quiet activemq; then
-                log_success "ActiveMQ configured and running"
+                
+                # Verify it's actually listening
+                if netstat -tln 2>/dev/null | grep -q ":61616 "; then
+                    log_success "ActiveMQ broker listening on port 61616"
+                else
+                    log_warn "ActiveMQ started but not listening on port 61616 yet"
+                    log_info "It may take a few seconds to fully initialize"
+                fi
                 
                 /usr/lib/pitrac/activemq-service-install.sh verify || true
             else
@@ -597,75 +500,60 @@ EOF
     
     mkdir -p /usr/share/pitrac/templates
     cp "$SCRIPT_DIR/templates/pitrac.service.template" /usr/share/pitrac/templates/
+    cp "$SCRIPT_DIR/templates/pitrac-web.service.template" /usr/share/pitrac/templates/
     cp "$SCRIPT_DIR/templates/activemq.xml.template" /usr/share/pitrac/templates/ 2>/dev/null || true
     cp "$SCRIPT_DIR/templates/log4j2.properties.template" /usr/share/pitrac/templates/ 2>/dev/null || true
     cp "$SCRIPT_DIR/templates/activemq-options.template" /usr/share/pitrac/templates/ 2>/dev/null || true
     
-    cp "$SCRIPT_DIR/src/lib/service-install.sh" /usr/lib/pitrac/
-    chmod 755 /usr/lib/pitrac/service-install.sh
+    cp "$SCRIPT_DIR/src/lib/pitrac-service-install.sh" /usr/lib/pitrac/
+    chmod 755 /usr/lib/pitrac/pitrac-service-install.sh
     
     if [[ -f "$SCRIPT_DIR/src/lib/activemq-service-install.sh" ]]; then
         cp "$SCRIPT_DIR/src/lib/activemq-service-install.sh" /usr/lib/pitrac/
         chmod 755 /usr/lib/pitrac/activemq-service-install.sh
     fi
     
+    if [[ -f "$SCRIPT_DIR/src/lib/web-service-install.sh" ]]; then
+        cp "$SCRIPT_DIR/src/lib/web-service-install.sh" /usr/lib/pitrac/
+        chmod 755 /usr/lib/pitrac/web-service-install.sh
+    fi
+    
+    if [[ -f "$SCRIPT_DIR/src/lib/pitrac-common-functions.sh" ]]; then
+        cp "$SCRIPT_DIR/src/lib/pitrac-common-functions.sh" /usr/lib/pitrac/
+        chmod 644 /usr/lib/pitrac/pitrac-common-functions.sh
+    fi
+    
     INSTALL_USER="${SUDO_USER:-$(whoami)}"
     log_info "Installing PiTrac service for user: $INSTALL_USER"
-    /usr/lib/pitrac/service-install.sh install "$INSTALL_USER"
+    /usr/lib/pitrac/pitrac-service-install.sh install "$INSTALL_USER"
 
     # Install Python web server (always update)
     log_info "Installing/Updating PiTrac web server..."
     WEB_SERVER_DIR="$REPO_ROOT/Software/web-server"
     if [[ -d "$WEB_SERVER_DIR" ]]; then
-        WEB_SERVICE_WAS_RUNNING=false
-        if systemctl is-active --quiet pitrac-web.service; then
-            WEB_SERVICE_WAS_RUNNING=true
-            log_info "Stopping web server for update..."
-            systemctl stop pitrac-web.service
-        fi
+        update_web_server() {
+            log_info "Cleaning previous web server installation..."
+            rm -rf /usr/lib/pitrac/web-server
+            mkdir -p /usr/lib/pitrac/web-server
 
-        log_info "Cleaning previous web server installation..."
-        rm -rf /usr/lib/pitrac/web-server
-        mkdir -p /usr/lib/pitrac/web-server
+            log_info "Copying latest web server files..."
+            cp -r "$WEB_SERVER_DIR"/* /usr/lib/pitrac/web-server/
 
-        log_info "Copying latest web server files..."
-        cp -r "$WEB_SERVER_DIR"/* /usr/lib/pitrac/web-server/
+            install_python_dependencies "/usr/lib/pitrac/web-server"
 
-        log_info "Installing Python dependencies for web server..."
-        pip3 install -r /usr/lib/pitrac/web-server/requirements.txt --break-system-packages 2>/dev/null || \
-        pip3 install -r /usr/lib/pitrac/web-server/requirements.txt
-
-        if [[ -f /usr/lib/pitrac/web-server/pitrac-web.service ]]; then
-            cp /usr/lib/pitrac/web-server/pitrac-web.service /etc/systemd/system/
-
-            # Get the actual user who invoked sudo (if any) for service configuration
-            ACTUAL_USER="${SUDO_USER:-$(whoami)}"
-            if [[ "$ACTUAL_USER" != "root" ]]; then
-                log_info "Configuring web service to run as user: $ACTUAL_USER"
-                mkdir -p /etc/systemd/system/pitrac-web.service.d
-                cat > /etc/systemd/system/pitrac-web.service.d/override.conf <<EOF
-[Service]
-User=$ACTUAL_USER
-Group=$ACTUAL_USER
-DynamicUser=no
-EOF
-            fi
-
-            systemctl daemon-reload
-
-            if [[ "$WEB_SERVICE_WAS_RUNNING" == "true" ]]; then
-                log_info "Restarting web server with updated code..."
-                systemctl start pitrac-web.service
-                
-                sleep 2
-                if systemctl is-active --quiet pitrac-web.service; then
-                    log_success "Web server restarted successfully"
-                else
-                    log_error "Web server failed to restart. Check logs with: journalctl -u pitrac-web.service"
-                fi
+            log_info "Installing web server service for user: $INSTALL_USER"
+            if [[ -x /usr/lib/pitrac/web-service-install.sh ]]; then
+                /usr/lib/pitrac/web-service-install.sh install "$INSTALL_USER"
             else
-                log_info "Web server installed but not started (was not running before)"
+                log_error "Web service installer not found"
             fi
+        }
+
+        if systemctl is-active --quiet pitrac-web.service; then
+            manage_service_restart "pitrac-web.service" update_web_server
+        else
+            update_web_server
+            log_info "Web server installed but not started (was not running before)"
         fi
 
         log_success "Web server updated"
@@ -673,10 +561,7 @@ EOF
         log_warn "Web server source not found at $WEB_SERVER_DIR"
     fi
 
-    # Create default directories
-    log_info "Creating default directories..."
-    mkdir -p /var/lib/pitrac
-    mkdir -p /usr/share/pitrac/{webapp,test-images,calibration}
+    create_pitrac_directories
 
     # Update systemd
     systemctl daemon-reload

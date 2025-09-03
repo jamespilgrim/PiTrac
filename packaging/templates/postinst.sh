@@ -44,22 +44,39 @@ case "$1" in
             fi
         fi
 
-        # System config should be root-owned and world-readable
-        chown root:root /etc/pitrac
-        chmod 755 /etc/pitrac
-        chown root:root /etc/pitrac/pitrac.yaml
-        chmod 644 /etc/pitrac/pitrac.yaml
-        if [ -f /etc/pitrac/golf_sim_config.json ]; then
-            chown root:root /etc/pitrac/golf_sim_config.json
-            chmod 644 /etc/pitrac/golf_sim_config.json
+        if type -t set_config_permissions &>/dev/null; then
+            chown root:root /etc/pitrac
+            chmod 755 /etc/pitrac
+            set_config_permissions "/etc/pitrac/pitrac.yaml"
+            set_config_permissions "/etc/pitrac/golf_sim_config.json"
+        else
+            chown root:root /etc/pitrac
+            chmod 755 /etc/pitrac
+            chown root:root /etc/pitrac/pitrac.yaml
+            chmod 644 /etc/pitrac/pitrac.yaml
+            if [ -f /etc/pitrac/golf_sim_config.json ]; then
+                chown root:root /etc/pitrac/golf_sim_config.json
+                chmod 644 /etc/pitrac/golf_sim_config.json
+            fi
         fi
 
 
-        # Install Python web server dependencies
         if [ -d /usr/lib/pitrac/web-server ]; then
-            echo "Installing Python web server dependencies..."
-            pip3 install -r /usr/lib/pitrac/web-server/requirements.txt --break-system-packages 2>/dev/null || \
-            pip3 install -r /usr/lib/pitrac/web-server/requirements.txt || true
+            if [ -f /usr/lib/pitrac/pitrac-common-functions.sh ]; then
+                . /usr/lib/pitrac/pitrac-common-functions.sh
+                install_python_dependencies "/usr/lib/pitrac/web-server"
+            else
+                echo "Installing Python web server dependencies..."
+                pip3 install -r /usr/lib/pitrac/web-server/requirements.txt --break-system-packages 2>/dev/null || \
+                pip3 install -r /usr/lib/pitrac/web-server/requirements.txt || true
+            fi
+            
+            if [ -x /usr/lib/pitrac/web-service-install.sh ] && [ -n "$ACTUAL_USER" ]; then
+                echo "Installing PiTrac web service for user: $ACTUAL_USER"
+                /usr/lib/pitrac/web-service-install.sh install "$ACTUAL_USER" || true
+            elif [ -x /usr/lib/pitrac/web-service-install.sh ]; then
+                echo "Note: Web service not installed. Run '/usr/lib/pitrac/web-service-install.sh install <username>' as a regular user"
+            fi
         fi
 
         # Apply Boost C++20 fix
@@ -121,6 +138,11 @@ case "$1" in
                 fi
             fi
         done
+        
+        if type -t create_pkgconfig_files &>/dev/null; then
+            create_pkgconfig_files
+        fi
+        
         # Update library cache
         ldconfig
 
@@ -164,29 +186,15 @@ case "$1" in
             # Don't start it here - let the user or pitrac CLI handle it
         fi
 
-        if [ -x /usr/lib/pitrac/service-install.sh ]; then
+        if [ -x /usr/lib/pitrac/pitrac-service-install.sh ]; then
             if [ -n "$ACTUAL_USER" ]; then
                 echo "Installing PiTrac service for user: $ACTUAL_USER"
-                /usr/lib/pitrac/service-install.sh install "$ACTUAL_USER" || true
+                /usr/lib/pitrac/pitrac-service-install.sh install "$ACTUAL_USER" || true
             else
-                echo "Note: PiTrac service not installed. Run '/usr/lib/pitrac/service-install.sh install <username>' to install for a specific user"
+                echo "Note: PiTrac service not installed. Run '/usr/lib/pitrac/pitrac-service-install.sh install <username>' to install for a specific user"
             fi
         fi
 
-        # Enable web server
-        if [ -f /etc/systemd/system/pitrac-web.service ]; then
-            # If we have an actual user, create a drop-in to override the user
-            if [ -n "$ACTUAL_USER" ]; then
-                mkdir -p /etc/systemd/system/pitrac-web.service.d
-                cat > /etc/systemd/system/pitrac-web.service.d/override.conf <<EOF
-[Service]
-User=$ACTUAL_USER
-Group=$ACTUAL_USER
-DynamicUser=no
-EOF
-            fi
-            systemctl enable pitrac-web.service || true
-        fi
 
         echo ""
         echo "======================================"

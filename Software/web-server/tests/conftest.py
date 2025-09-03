@@ -36,6 +36,8 @@ def server_instance(mock_activemq):
     """Create PiTracServer instance with mocked dependencies"""
     server = PiTracServer()
     server.mq_conn = mock_activemq
+    server.shutdown_flag = False
+    server.reconnect_task = None
     return server
 
 

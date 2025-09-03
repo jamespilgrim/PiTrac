@@ -160,6 +160,92 @@ class TestActiveMQIntegration:
         listener.on_connected(MagicMock())
         assert listener.connected is True
     
+    def test_activemq_heartbeat_handlers(self, shot_store, connection_manager, parser):
+        """Test ActiveMQ heartbeat handlers"""
+        listener = ActiveMQListener(shot_store, connection_manager, parser)
+        
+        listener.on_heartbeat()
+        
+        listener.on_connected(MagicMock())
+        assert listener.connected is True
+        
+        listener.on_heartbeat_timeout()
+        assert listener.connected is False
+    
+    @pytest.mark.asyncio
+    async def test_server_reconnection_task_startup(self, mock_home_dir):
+        """Test that reconnection task starts on server startup"""
+        with patch('constants.CONFIG_FILE', mock_home_dir / ".pitrac" / "config" / "pitrac.yaml"):
+            with patch('server.stomp.Connection') as mock_conn:
+                from server import PiTracServer
+                
+                server = PiTracServer()
+                server.shutdown_flag = False
+                
+                with patch('asyncio.create_task') as mock_create_task:
+                    await server.startup_event()
+                    mock_create_task.assert_called_once()
+    
+    @pytest.mark.asyncio
+    async def test_server_reconnection_loop(self, mock_home_dir):
+        """Test the reconnection loop behavior"""
+        with patch('constants.CONFIG_FILE', mock_home_dir / ".pitrac" / "config" / "pitrac.yaml"):
+            with patch('server.stomp.Connection') as mock_conn_class:
+                from server import PiTracServer
+                
+                server = PiTracServer()
+                server.shutdown_flag = False
+                
+                mock_conn = MagicMock()
+                mock_conn.is_connected.side_effect = [False, False, True]
+                server.mq_conn = mock_conn
+                
+                with patch.object(server, 'setup_activemq') as mock_setup:
+                    mock_setup.side_effect = [None, mock_conn]
+                    
+                    reconnect_task = asyncio.create_task(server.reconnect_activemq_loop())
+                    
+                    await asyncio.sleep(0.1)
+                    server.shutdown_flag = True
+                    
+                    reconnect_task.cancel()
+                    try:
+                        await reconnect_task
+                    except asyncio.CancelledError:
+                        pass
+                    
+                    assert mock_setup.call_count >= 1
+    
+    @pytest.mark.asyncio
+    async def test_server_shutdown_cleanup(self, mock_home_dir):
+        """Test proper cleanup during shutdown"""
+        with patch('constants.CONFIG_FILE', mock_home_dir / ".pitrac" / "config" / "pitrac.yaml"):
+            with patch('server.stomp.Connection') as mock_conn_class:
+                from server import PiTracServer
+                
+                server = PiTracServer()
+                server.shutdown_flag = False
+                
+                mock_conn = MagicMock()
+                server.mq_conn = mock_conn
+                
+                async def dummy_task():
+                    try:
+                        while True:
+                            await asyncio.sleep(1)
+                    except asyncio.CancelledError:
+                        pass
+                
+                server.reconnect_task = asyncio.create_task(dummy_task())
+                
+                await server.shutdown_event()
+                
+                assert server.shutdown_flag is True
+                
+                assert server.reconnect_task.cancelled()
+                
+                mock_conn.disconnect.assert_called_once()
+    
     def test_listener_statistics(self, shot_store, connection_manager, parser):
         """Test listener statistics tracking"""
         listener = ActiveMQListener(shot_store, connection_manager, parser)
@@ -222,3 +308,30 @@ class TestActiveMQIntegration:
             stored = server_instance.shot_store.get()
             assert stored.carry == 250.5
             assert abs(stored.speed - 145.4) < 0.1  # m/s to mph conversion
+    
+    @pytest.mark.asyncio
+    async def test_reconnection_with_exponential_backoff(self, mock_home_dir):
+        """Test that reconnection uses exponential backoff"""
+        with patch('constants.CONFIG_FILE', mock_home_dir / ".pitrac" / "config" / "pitrac.yaml"):
+            with patch('server.stomp.Connection'):
+                from server import PiTracServer
+                
+                server = PiTracServer()
+                server.shutdown_flag = False
+                
+                sleep_delays = []
+                
+                async def mock_sleep(delay):
+                    sleep_delays.append(delay)
+                    if len(sleep_delays) >= 3:
+                        server.shutdown_flag = True
+                    return
+                
+                with patch('asyncio.sleep', side_effect=mock_sleep):
+                    with patch.object(server, 'setup_activemq', return_value=None):
+                        await server.reconnect_activemq_loop()
+                
+                assert len(sleep_delays) >= 2
+                if len(sleep_delays) >= 2:
+                    assert sleep_delays[0] == 5  # Initial retry delay
+                    assert sleep_delays[1] == 10  # Doubled delay

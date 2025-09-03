@@ -8,25 +8,29 @@ ARCH="${PITRAC_ARCH:-arm64}"
 MAINTAINER="PiTrac Team <team@pitrac.io>"
 DESCRIPTION="Open-source DIY golf launch monitor for Raspberry Pi"
 
-# Colors
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
-NC='\033[0m'
-
-log_info() { echo -e "${BLUE}[INFO]${NC} $*"; }
-log_warn() { echo -e "${YELLOW}[WARN]${NC} $*"; }
-log_error() { echo -e "${RED}[ERROR]${NC} $*" >&2; }
-log_success() { echo -e "${GREEN}[✓]${NC} $*"; }
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+if [[ -f "$SCRIPT_DIR/src/lib/pitrac-common-functions.sh" ]]; then
+    source "$SCRIPT_DIR/src/lib/pitrac-common-functions.sh"
+else
+    RED='\033[0;31m'
+    GREEN='\033[0;32m'
+    YELLOW='\033[1;33m'
+    BLUE='\033[0;34m'
+    NC='\033[0m'
+
+    log_info() { echo -e "${BLUE}[INFO]${NC} $*"; }
+    log_warn() { echo -e "${YELLOW}[WARN]${NC} $*"; }
+    log_error() { echo -e "${RED}[ERROR]${NC} $*" >&2; }
+    log_success() { echo -e "${GREEN}[✓]${NC} $*"; }
+fi
+
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 POC_DIR="$SCRIPT_DIR"
 BUILD_DIR="$POC_DIR/build/package"
 DEB_DIR="$BUILD_DIR/debian"
 PACKAGE_NAME="pitrac_${VERSION}_${ARCH}"
 
-# Check prerequisites
 check_prerequisites() {
     log_info "Checking prerequisites..."
     
@@ -59,7 +63,6 @@ check_prerequisites() {
     log_success "All prerequisites found"
 }
 
-# Install pre-built webapp if available
 install_webapp() {
     local webapp_artifact="$POC_DIR/deps-artifacts/golfsim-1.0.0-noarch.war"
     
@@ -75,11 +78,9 @@ install_webapp() {
     fi
 }
 
-# Extract PiTrac binary from Docker container
 extract_pitrac_binary() {
     log_info "Extracting PiTrac binary from Docker build..."
     
-    # Check if we already have the built binary from a previous run
     if [[ -f "$REPO_ROOT/Software/LMSourceCode/ImageProcessing/build/pitrac_lm" ]]; then
         log_info "Using existing built binary"
         cp "$REPO_ROOT/Software/LMSourceCode/ImageProcessing/build/pitrac_lm" "$BUILD_DIR/pitrac_lm.tmp"
@@ -87,7 +88,6 @@ extract_pitrac_binary() {
     else
         log_info "Binary not found, extracting from Docker container..."
         
-        # Create a container from the built image to extract the binary
         local container_id=$(docker create pitrac-poc:arm64 2>/dev/null)
         
         if [[ -z "$container_id" ]]; then
@@ -95,7 +95,6 @@ extract_pitrac_binary() {
             exit 1
         fi
         
-        # Extract the binary
         docker cp "$container_id:/build/Software/LMSourceCode/ImageProcessing/build/pitrac_lm" "$BUILD_DIR/pitrac_lm.tmp"
         docker rm "$container_id" > /dev/null
         
@@ -111,7 +110,6 @@ extract_pitrac_binary() {
 create_cli_wrapper() {
     log_info "Creating CLI wrapper..."
     
-    # First, generate the Bashly script if it doesn't exist
     if [[ ! -f "$SCRIPT_DIR/pitrac" ]]; then
         log_info "Generating Bashly CLI script..."
         if [[ -f "$SCRIPT_DIR/generate.sh" ]]; then
@@ -135,7 +133,6 @@ create_cli_wrapper() {
     log_success "CLI wrapper created"
 }
 
-# Prepare build environment
 prepare_build_env() {
     log_info "Preparing build environment..."
     rm -rf "$BUILD_DIR"
@@ -146,37 +143,21 @@ prepare_build_env() {
     log_success "Build directories created"
 }
 
-# Install binaries
 install_binaries() {
     log_info "Installing binaries..."
     
-    # Install main binary
     install -m 755 "$BUILD_DIR/pitrac_lm.tmp" "$DEB_DIR/usr/lib/pitrac/pitrac_lm"
     
-    # Install CLI tool (Bashly-generated script is self-contained)
     install -m 755 "$BUILD_DIR/pitrac-cli" "$DEB_DIR/usr/bin/pitrac"
     
     log_success "Binaries installed"
 }
 
-# Install test images and calibration tools
 install_test_resources() {
     log_info "Installing test images and calibration tools..."
     
-    local test_images_dir="$REPO_ROOT/Software/LMSourceCode/Images"
-    if [[ -d "$test_images_dir" ]]; then
-        if [[ -f "$test_images_dir/gs_log_img__log_ball_final_found_ball_img.png" ]]; then
-            cp "$test_images_dir/gs_log_img__log_ball_final_found_ball_img.png" \
-               "$DEB_DIR/usr/share/pitrac/test-images/teed-ball.png"
-        fi
-        if [[ -f "$test_images_dir/log_cam2_last_strobed_img.png" ]]; then
-            cp "$test_images_dir/log_cam2_last_strobed_img.png" \
-               "$DEB_DIR/usr/share/pitrac/test-images/strobed.png"
-        fi
-        log_success "Test images installed"
-    else
-        log_warn "Test images directory not found"
-    fi
+    install_test_images "$DEB_DIR/usr/share/pitrac/test-images" "$REPO_ROOT"
+    install_camera_tools "$DEB_DIR/usr/lib/pitrac" "$REPO_ROOT"
     
     local calib_dir="$REPO_ROOT/Software/CalibrateCameraDistortions"
     if [[ -d "$calib_dir" ]]; then
@@ -185,22 +166,6 @@ install_test_resources() {
         log_success "Calibration tools installed"
     else
         log_warn "Calibration tools not found"
-    fi
-    
-    log_info "Installing camera tools..."
-    local camera_tools_dir="$REPO_ROOT/Software/LMSourceCode/ImageProcessing/CameraTools"
-    if [[ -d "$camera_tools_dir" ]]; then
-        mkdir -p "$DEB_DIR/usr/lib/pitrac/ImageProcessing/CameraTools"
-        cp -r "$camera_tools_dir"/* "$DEB_DIR/usr/lib/pitrac/ImageProcessing/CameraTools/"
-        
-        find "$DEB_DIR/usr/lib/pitrac/ImageProcessing/CameraTools" -name "*.sh" -type f -exec chmod 755 {} \;
-        if [[ -f "$DEB_DIR/usr/lib/pitrac/ImageProcessing/CameraTools/imx296_trigger" ]]; then
-            chmod 755 "$DEB_DIR/usr/lib/pitrac/ImageProcessing/CameraTools/imx296_trigger"
-        fi
-        
-        log_success "Camera tools installed"
-    else
-        log_warn "Camera tools not found"
     fi
     
     cat > "$DEB_DIR/usr/lib/pitrac/calibration-wizard" << 'EOF'
@@ -221,29 +186,8 @@ bundle_dependencies() {
     
     local lib_dir="$DEB_DIR/usr/lib/pitrac"
     
-    log_info "  OpenCV 4.11.0..."
-    tar xzf "$POC_DIR/deps-artifacts/opencv-4.11.0-arm64.tar.gz" -C /tmp/
-    cp -r /tmp/opencv/lib/*.so* "$lib_dir/" 2>/dev/null || true
-    rm -rf /tmp/opencv
+    extract_all_dependencies "$POC_DIR/deps-artifacts" "$lib_dir"
     
-    log_info "  ActiveMQ-CPP 3.9.5..."
-    tar xzf "$POC_DIR/deps-artifacts/activemq-cpp-3.9.5-arm64.tar.gz" -C /tmp/
-    cp -r /tmp/activemq-cpp/lib/*.so* "$lib_dir/" 2>/dev/null || true
-    rm -rf /tmp/activemq-cpp
-    
-    log_info "  lgpio 0.2.2..."
-    tar xzf "$POC_DIR/deps-artifacts/lgpio-0.2.2-arm64.tar.gz" -C /tmp/
-    cp -r /tmp/lgpio/lib/*.so* "$lib_dir/" 2>/dev/null || true
-    rm -rf /tmp/lgpio
-    
-    log_info "  msgpack-cxx 6.1.1..."
-    tar xzf "$POC_DIR/deps-artifacts/msgpack-cxx-6.1.1-arm64.tar.gz" -C /tmp/
-    if [[ -d /tmp/msgpack/lib ]]; then
-        cp -r /tmp/msgpack/lib/*.so* "$lib_dir/" 2>/dev/null || true
-    fi
-    rm -rf /tmp/msgpack
-    
-    # Install Python web server
     log_info "  PiTrac Web Server..."
     WEB_SERVER_DIR="$REPO_ROOT/Software/web-server"
     if [[ -d "$WEB_SERVER_DIR" ]]; then
@@ -269,7 +213,6 @@ create_configs() {
     cp "$SCRIPT_DIR/templates/golf_sim_config.json" "$DEB_DIR/etc/pitrac/golf_sim_config.json"
     cp "$SCRIPT_DIR/templates/golf_sim_config.json" "$DEB_DIR/usr/share/pitrac/golf_sim_config.json.default"
     
-    # Install configuration templates (required by generated pitrac CLI)
     if [[ -d "$SCRIPT_DIR/templates/config" ]]; then
         cp "$SCRIPT_DIR/templates/config/settings-basic.yaml" "$DEB_DIR/etc/pitrac/config/"
         cp "$SCRIPT_DIR/templates/config/settings-advanced.yaml" "$DEB_DIR/etc/pitrac/config/"
@@ -281,6 +224,7 @@ create_configs() {
     fi
 
     cp "$SCRIPT_DIR/templates/pitrac.service.template" "$DEB_DIR/usr/share/pitrac/templates/pitrac.service.template"
+    cp "$SCRIPT_DIR/templates/pitrac-web.service.template" "$DEB_DIR/usr/share/pitrac/templates/pitrac-web.service.template"
     
     if [[ -f "$SCRIPT_DIR/templates/activemq.xml.template" ]]; then
         cp "$SCRIPT_DIR/templates/activemq.xml.template" "$DEB_DIR/usr/share/pitrac/templates/activemq.xml.template"
@@ -291,8 +235,18 @@ create_configs() {
         log_warn "ActiveMQ templates not found"
     fi
     
-    cp "$SCRIPT_DIR/src/lib/service-install.sh" "$DEB_DIR/usr/lib/pitrac/service-install.sh"
-    chmod 755 "$DEB_DIR/usr/lib/pitrac/service-install.sh"
+    cp "$SCRIPT_DIR/src/lib/pitrac-service-install.sh" "$DEB_DIR/usr/lib/pitrac/pitrac-service-install.sh"
+    chmod 755 "$DEB_DIR/usr/lib/pitrac/pitrac-service-install.sh"
+    
+    if [[ -f "$SCRIPT_DIR/src/lib/web-service-install.sh" ]]; then
+        cp "$SCRIPT_DIR/src/lib/web-service-install.sh" "$DEB_DIR/usr/lib/pitrac/web-service-install.sh"
+        chmod 755 "$DEB_DIR/usr/lib/pitrac/web-service-install.sh"
+    fi
+    
+    if [[ -f "$SCRIPT_DIR/src/lib/pitrac-common-functions.sh" ]]; then
+        cp "$SCRIPT_DIR/src/lib/pitrac-common-functions.sh" "$DEB_DIR/usr/lib/pitrac/pitrac-common-functions.sh"
+        chmod 644 "$DEB_DIR/usr/lib/pitrac/pitrac-common-functions.sh"
+    fi
     
     if [[ -f "$SCRIPT_DIR/src/lib/activemq-service-install.sh" ]]; then
         cp "$SCRIPT_DIR/src/lib/activemq-service-install.sh" "$DEB_DIR/usr/lib/pitrac/activemq-service-install.sh"
@@ -301,14 +255,6 @@ create_configs() {
     else
         log_warn "ActiveMQ configuration installer not found"
     fi
-    
-    # Install web server service
-    if [[ -f "$DEB_DIR/usr/lib/pitrac/web-server/pitrac-web.service" ]]; then
-        cp "$DEB_DIR/usr/lib/pitrac/web-server/pitrac-web.service" "$DEB_DIR/etc/systemd/system/"
-    else
-        log_error "Web server service file not found"
-        exit 1
-    fi
 
     log_success "Configs created"
 }
@@ -316,10 +262,8 @@ create_configs() {
 create_debian_control() {
     log_info "Creating Debian control files..."
     
-    # Calculate installed size
     local size=$(du -sk "$DEB_DIR" | cut -f1)
     
-    # Control file
     cat > "$DEB_DIR/DEBIAN/control" << EOF
 Package: pitrac
 Version: $VERSION
@@ -362,7 +306,6 @@ build_package() {
     chmod 755 debian/usr/bin/pitrac
     chmod 755 debian/usr/lib/pitrac/pitrac_lm
     chmod 755 debian/usr/lib/pitrac/calibration-wizard
-    # No TomEE to set permissions for
     
     dpkg-deb --root-owner-group --build debian "$PACKAGE_NAME.deb"
     

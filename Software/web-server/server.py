@@ -36,6 +36,8 @@ class PiTracServer:
         self.parser = ShotDataParser()
         self.mq_conn: Optional[stomp.Connection] = None
         self.listener: Optional[ActiveMQListener] = None
+        self.reconnect_task: Optional[asyncio.Task] = None
+        self.shutdown_flag = False
         
         IMAGES_DIR.mkdir(parents=True, exist_ok=True)
         
@@ -192,16 +194,66 @@ class PiTracServer:
             logger.error(f"Unexpected error connecting to ActiveMQ: {e}", exc_info=True)
             return None
     
+    async def reconnect_activemq_loop(self) -> None:
+        """Background task to maintain ActiveMQ connection"""
+        loop = asyncio.get_event_loop()
+        retry_delay = 5 
+        max_retry_delay = 60 
+        
+        while not self.shutdown_flag:
+            try:
+                if self.mq_conn and self.mq_conn.is_connected():
+                    retry_delay = 5
+                    await asyncio.sleep(10)
+                    continue
+                
+                logger.info("ActiveMQ connection lost, attempting to reconnect...")
+                
+                if self.mq_conn:
+                    try:
+                        self.mq_conn.disconnect()
+                    except:
+                        pass
+                    self.mq_conn = None
+                
+                self.mq_conn = self.setup_activemq(loop)
+                
+                if self.mq_conn:
+                    logger.info("Successfully reconnected to ActiveMQ")
+                    retry_delay = 5
+                else:
+                    logger.warning(f"Failed to reconnect to ActiveMQ, retrying in {retry_delay} seconds")
+                    await asyncio.sleep(retry_delay)
+                    retry_delay = min(retry_delay * 2, max_retry_delay)
+                    
+            except Exception as e:
+                logger.error(f"Error in reconnection loop: {e}", exc_info=True)
+                await asyncio.sleep(retry_delay)
+                retry_delay = min(retry_delay * 2, max_retry_delay)
+    
     async def startup_event(self) -> None:
         logger.info("Starting PiTrac Web Server...")
         loop = asyncio.get_event_loop()
+        
         self.mq_conn = self.setup_activemq(loop)
         
         if not self.mq_conn:
-            logger.warning("Running without ActiveMQ connection - shots won't be received")
+            logger.warning("Could not connect to ActiveMQ at startup - will retry in background")
+        
+        self.reconnect_task = asyncio.create_task(self.reconnect_activemq_loop())
+        logger.info("Started ActiveMQ reconnection monitor")
     
     async def shutdown_event(self) -> None:
         logger.info("Shutting down PiTrac Web Server...")
+        
+        self.shutdown_flag = True
+        
+        if self.reconnect_task and not self.reconnect_task.done():
+            self.reconnect_task.cancel()
+            try:
+                await self.reconnect_task
+            except asyncio.CancelledError:
+                pass
         
         if self.mq_conn:
             try:

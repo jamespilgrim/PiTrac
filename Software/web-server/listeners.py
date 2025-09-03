@@ -118,6 +118,15 @@ class ActiveMQListener(stomp.ConnectionListener):
         logger.warning(f"Disconnected from ActiveMQ (processed {self.message_count} messages)")
         self.connected = False
     
+    def on_heartbeat(self) -> None:
+        """Called when a heartbeat is received from the broker"""
+        pass
+    
+    def on_heartbeat_timeout(self) -> None:
+        """Called when heartbeat timeout occurs"""
+        logger.warning("ActiveMQ heartbeat timeout detected")
+        self.connected = False
+    
     def get_stats(self) -> Dict[str, Any]:
         return {
             "connected": self.connected,
