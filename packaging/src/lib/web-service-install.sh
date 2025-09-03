@@ -125,33 +125,3 @@ verify_web_service() {
         return 1
     fi
 }
-
-if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
-    action="${1:-}"
-    user="${2:-$(whoami)}"
-    
-    case "$action" in
-        install)
-            install_web_service "$user"
-            ;;
-        update)
-            update_web_service_user "$user"
-            ;;
-        uninstall)
-            uninstall_web_service
-            ;;
-        verify)
-            verify_web_service
-            ;;
-        *)
-            echo "Usage: $0 [install|update|uninstall|verify] [username]"
-            echo ""
-            echo "Actions:"
-            echo "  install   - Install web service for specified user"
-            echo "  update    - Update service to run as different user"
-            echo "  uninstall - Remove web service completely"
-            echo "  verify    - Check service configuration"
-            exit 1
-            ;;
-    esac
-fi
