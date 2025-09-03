@@ -500,7 +500,15 @@ body {
 .ball-icon {
     width: 100%;
     height: 100%;
-    color: var(--text-muted);
+    background-color: var(--text-muted);
+    -webkit-mask-image: url('/static/golf_ball.svg');
+    -webkit-mask-size: contain;
+    -webkit-mask-repeat: no-repeat;
+    -webkit-mask-position: center;
+    mask-image: url('/static/golf_ball.svg');
+    mask-size: contain;
+    mask-repeat: no-repeat;
+    mask-position: center;
     transition: all 0.3s ease;
 }
 
@@ -526,7 +534,7 @@ body {
 }
 
 .ball-ready-indicator.initializing .ball-icon {
-    color: var(--info);
+    background-color: var(--info);
     animation: pulse 2s infinite;
 }
 
@@ -535,7 +543,7 @@ body {
 }
 
 .ball-ready-indicator.waiting .ball-icon {
-    color: var(--warning);
+    background-color: var(--warning);
     animation: pulse 2s infinite;
 }
 
@@ -544,7 +552,7 @@ body {
 }
 
 .ball-ready-indicator.stabilizing .ball-icon {
-    color: #fbbf24;
+    background-color: #fbbf24;
     animation: bounce 1s infinite;
 }
 
@@ -554,7 +562,7 @@ body {
 }
 
 .ball-ready-indicator.ready .ball-icon {
-    color: var(--success);
+    background-color: var(--success);
     transform: scale(1.1);
 }
 
@@ -567,7 +575,7 @@ body {
 }
 
 .ball-ready-indicator.hit .ball-icon {
-    color: var(--accent-primary);
+    background-color: var(--accent-primary);
     animation: none;
 }
 
@@ -576,7 +584,7 @@ body {
 }
 
 .ball-ready-indicator.error .ball-icon {
-    color: var(--error);
+    background-color: var(--error);
 }
 
 @media print {

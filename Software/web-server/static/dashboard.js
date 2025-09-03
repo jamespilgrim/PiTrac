@@ -87,8 +87,9 @@ function updateDisplay(data) {
     updateMetric('back_spin', data.back_spin || '0');
     updateMetric('side_spin', data.side_spin || '0');
 
-    document.getElementById('result_type').textContent = data.result_type || 'Waiting...';
-    document.getElementById('message').textContent = data.message || '';
+    // These elements are commented out in HTML:
+    // document.getElementById('result_type').textContent = data.result_type || 'Waiting...';
+    // document.getElementById('message').textContent = data.message || '';
 
     // Update ball ready status indicator
     updateBallStatus(data.result_type, data.message);
@@ -208,9 +209,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     setInterval(checkSystemStatus, 5000);
 
-    const currentResultType = document.getElementById('result_type').textContent;
-    const currentMessage = document.getElementById('message').textContent;
-    updateBallStatus(currentResultType, currentMessage);
+    // Initialize with default status since result_type and message elements are commented out
+    updateBallStatus('Initializing', 'System starting up...');
 
     document.addEventListener('visibilitychange', () => {
         if (!document.hidden && (!ws || ws.readyState !== WebSocket.OPEN)) {
