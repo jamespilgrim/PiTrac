@@ -127,41 +127,40 @@ case "$1" in
         # Reload systemd
         systemctl daemon-reload
 
-        # Configure ActiveMQ instance
-        if [ -d /etc/activemq/instances-available ] && [ ! -e /etc/activemq/instances-enabled/main ]; then
-            echo "Enabling ActiveMQ main instance..."
-            # Ensure directory exists and clean up any existing instances
-            mkdir -p /etc/activemq/instances-enabled
-            rm -f /etc/activemq/instances-enabled/*
-            ln -sf /etc/activemq/instances-available/main /etc/activemq/instances-enabled/main
-
-            # Create directories for ActiveMQ
-            mkdir -p /var/lib/activemq/main
-            mkdir -p /var/lib/activemq/conf
-            mkdir -p /var/lib/activemq/data
-            mkdir -p /var/lib/activemq/tmp
-
-            # Copy configs to instance directory
-            if [ -f /etc/activemq/instances-available/main/activemq.xml ]; then
-                cp /etc/activemq/instances-available/main/activemq.xml /var/lib/activemq/main/ 2>/dev/null || true
+        # Configure ActiveMQ
+        if command -v activemq &>/dev/null || [ -f /usr/share/activemq/bin/activemq ]; then
+            echo "Configuring ActiveMQ for PiTrac..."
+            
+            if [ -x /usr/lib/pitrac/activemq-service-install.sh ]; then
+                echo "Installing ActiveMQ configuration from templates..."
+                export ACTIVEMQ_BROKER_NAME="localhost"
+                export ACTIVEMQ_BIND_ADDRESS="127.0.0.1"
+                export ACTIVEMQ_PORT="61616"
+                export ACTIVEMQ_LOG_LEVEL="INFO"
+                export PITRAC_TEMPLATE_DIR="/usr/share/pitrac/templates"
+                
+                if /usr/lib/pitrac/activemq-service-install.sh install activemq; then
+                    echo "ActiveMQ configuration installed successfully"
+                else
+                    echo "Warning: ActiveMQ configuration failed, falling back to basic setup"
+                    mkdir -p /etc/activemq/instances-available/main
+                    mkdir -p /etc/activemq/instances-enabled
+                    if [ ! -e /etc/activemq/instances-enabled/main ]; then
+                        ln -sf /etc/activemq/instances-available/main /etc/activemq/instances-enabled/main
+                    fi
+                fi
+            else
+                echo "Warning: ActiveMQ configuration script not found, using basic setup"
+                if [ -d /etc/activemq/instances-available ] && [ ! -e /etc/activemq/instances-enabled/main ]; then
+                    mkdir -p /etc/activemq/instances-enabled
+                    ln -sf /etc/activemq/instances-available/main /etc/activemq/instances-enabled/main
+                fi
             fi
-            if [ -f /etc/activemq/instances-available/main/log4j2.properties ]; then
-                cp /etc/activemq/instances-available/main/log4j2.properties /var/lib/activemq/main/ 2>/dev/null || true
-            fi
-
-            # Also copy to /var/lib/activemq/conf where ActiveMQ actually looks
-            if [ -f /etc/activemq/instances-available/main/activemq.xml ]; then
-                cp /etc/activemq/instances-available/main/activemq.xml /var/lib/activemq/conf/ 2>/dev/null || true
-            fi
-            if [ -f /etc/activemq/instances-available/main/log4j2.properties ]; then
-                cp /etc/activemq/instances-available/main/log4j2.properties /var/lib/activemq/conf/ 2>/dev/null || true
-            fi
-
-            # Set proper ownership for ALL ActiveMQ directories
+            
             if getent passwd activemq >/dev/null; then
-                chown -R activemq:activemq /var/lib/activemq/
+                chown -R activemq:activemq /var/lib/activemq/ 2>/dev/null || true
             fi
-
+            
             # Don't start it here - let the user or pitrac CLI handle it
         fi
 

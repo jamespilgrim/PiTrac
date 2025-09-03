@@ -282,8 +282,25 @@ create_configs() {
 
     cp "$SCRIPT_DIR/templates/pitrac.service.template" "$DEB_DIR/usr/share/pitrac/templates/pitrac.service.template"
     
+    if [[ -f "$SCRIPT_DIR/templates/activemq.xml.template" ]]; then
+        cp "$SCRIPT_DIR/templates/activemq.xml.template" "$DEB_DIR/usr/share/pitrac/templates/activemq.xml.template"
+        cp "$SCRIPT_DIR/templates/log4j2.properties.template" "$DEB_DIR/usr/share/pitrac/templates/log4j2.properties.template"
+        cp "$SCRIPT_DIR/templates/activemq-options.template" "$DEB_DIR/usr/share/pitrac/templates/activemq-options.template"
+        log_info "ActiveMQ templates installed"
+    else
+        log_warn "ActiveMQ templates not found"
+    fi
+    
     cp "$SCRIPT_DIR/src/lib/service-install.sh" "$DEB_DIR/usr/lib/pitrac/service-install.sh"
     chmod 755 "$DEB_DIR/usr/lib/pitrac/service-install.sh"
+    
+    if [[ -f "$SCRIPT_DIR/src/lib/activemq-service-install.sh" ]]; then
+        cp "$SCRIPT_DIR/src/lib/activemq-service-install.sh" "$DEB_DIR/usr/lib/pitrac/activemq-service-install.sh"
+        chmod 755 "$DEB_DIR/usr/lib/pitrac/activemq-service-install.sh"
+        log_info "ActiveMQ configuration installer installed"
+    else
+        log_warn "ActiveMQ configuration installer not found"
+    fi
     
     # Install web server service
     if [[ -f "$DEB_DIR/usr/lib/pitrac/web-server/pitrac-web.service" ]]; then

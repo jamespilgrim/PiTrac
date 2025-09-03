@@ -26,6 +26,7 @@ class ShotDataParser:
         result_type = data[8]
         message = data[9]
         # log_messages = data[10] if len(data) > 10 else []  # Currently unused
+        image_file_paths = data[11] if len(data) > 11 else []
         
         try:
             result_type_str = ResultType(result_type).name.replace("_", " ").title()
@@ -42,7 +43,8 @@ class ShotDataParser:
             side_spin=int(side_spin_rpm),
             result_type=result_type_str,
             message=message,
-            timestamp=datetime.now().isoformat()
+            timestamp=datetime.now().isoformat(),
+            images=image_file_paths
         )
     
     @staticmethod

@@ -550,76 +550,41 @@ EOF
 
     # Configure ActiveMQ
     if command -v activemq &>/dev/null || [[ -f /usr/share/activemq/bin/activemq ]]; then
-        log_info "Configuring ActiveMQ..."
-
-        # Create all required directories
-        mkdir -p /etc/activemq/instances-available/main
-        mkdir -p /etc/activemq/instances-enabled
-        mkdir -p /var/lib/activemq/conf
-        mkdir -p /var/lib/activemq/data
-        mkdir -p /var/lib/activemq/tmp
-
-        # Create basic ActiveMQ config if it doesn't exist
-        if [[ ! -f /etc/activemq/instances-available/main/activemq.xml ]]; then
-            cat > /etc/activemq/instances-available/main/activemq.xml <<'EOF'
-<beans xmlns="http://www.springframework.org/schema/beans"
-       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-       xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans.xsd http://activemq.apache.org/schema/core http://activemq.apache.org/schema/core/activemq-core.xsd">
-
-    <broker xmlns="http://activemq.apache.org/schema/core"
-            brokerName="localhost"
-            dataDirectory="${activemq.data}">
-
-        <transportConnectors>
-            <transportConnector name="openwire" uri="tcp://127.0.0.1:61616"/>
-            <transportConnector name="stomp" uri="stomp://127.0.0.1:61613"/>
-        </transportConnectors>
-
-    </broker>
-</beans>
-EOF
+        log_info "Configuring ActiveMQ using template system..."
+        
+        if [[ ! -f /usr/share/pitrac/templates/activemq.xml.template ]]; then
+            mkdir -p /usr/share/pitrac/templates
+            cp "$SCRIPT_DIR/templates/activemq.xml.template" /usr/share/pitrac/templates/
+            cp "$SCRIPT_DIR/templates/log4j2.properties.template" /usr/share/pitrac/templates/
+            cp "$SCRIPT_DIR/templates/activemq-options.template" /usr/share/pitrac/templates/
         fi
-
-
-        if [[ ! -f /etc/activemq/instances-available/main/log4j2.properties ]]; then
-            cat > /etc/activemq/instances-available/main/log4j2.properties <<'EOF'
-appender.console.type = Console
-appender.console.name = console
-appender.console.layout.type = PatternLayout
-appender.console.layout.pattern = %d{ISO8601} | %-5p | %m%n
-
-rootLogger.level = INFO
-rootLogger.appenderRef.console.ref = console
-EOF
+        
+        if [[ ! -f /usr/lib/pitrac/activemq-service-install.sh ]]; then
+            mkdir -p /usr/lib/pitrac
+            cp "$SCRIPT_DIR/src/lib/activemq-service-install.sh" /usr/lib/pitrac/
+            chmod 755 /usr/lib/pitrac/activemq-service-install.sh
         fi
-
-        if [[ ! -e /etc/activemq/instances-enabled/main ]]; then
-            ln -sf /etc/activemq/instances-available/main /etc/activemq/instances-enabled/main
-        fi
-
-        mkdir -p /var/lib/activemq/main
-        cp /etc/activemq/instances-available/main/activemq.xml /var/lib/activemq/main/ 2>/dev/null || true
-        cp /etc/activemq/instances-available/main/log4j2.properties /var/lib/activemq/main/ 2>/dev/null || true
-
-        cp /etc/activemq/instances-available/main/activemq.xml /var/lib/activemq/conf/ 2>/dev/null || true
-        cp /etc/activemq/instances-available/main/log4j2.properties /var/lib/activemq/conf/ 2>/dev/null || true
-
-        # Set ownership if activemq user exists
-        if getent passwd activemq >/dev/null; then
-            chown -R activemq:activemq /var/lib/activemq/
-        fi
-
-        # Restart ActiveMQ to pick up the new configuration
-        log_info "Restarting ActiveMQ to apply configuration..."
-        systemctl restart activemq
-        systemctl enable activemq
-
-        # Verify ActiveMQ is running properly
-        sleep 2
-        if systemctl is-active --quiet activemq; then
-            log_success "ActiveMQ configured and running"
+        
+        log_info "Installing ActiveMQ configuration..."
+        if /usr/lib/pitrac/activemq-service-install.sh install activemq; then
+            log_success "ActiveMQ configuration installed successfully"
+            
+            log_info "Restarting ActiveMQ service..."
+            systemctl restart activemq
+            systemctl enable activemq
+            
+            sleep 2
+            if systemctl is-active --quiet activemq; then
+                log_success "ActiveMQ configured and running"
+                
+                /usr/lib/pitrac/activemq-service-install.sh verify || true
+            else
+                log_warn "ActiveMQ configured but may need manual restart"
+                log_info "Check logs with: journalctl -u activemq -n 50"
+            fi
         else
-            log_warn "ActiveMQ configured but may need manual restart"
+            log_error "Failed to configure ActiveMQ"
+            log_info "Try running manually: /usr/lib/pitrac/activemq-service-install.sh install"
         fi
     else
         log_error "ActiveMQ installation failed! This is a critical component."
@@ -632,8 +597,17 @@ EOF
     
     mkdir -p /usr/share/pitrac/templates
     cp "$SCRIPT_DIR/templates/pitrac.service.template" /usr/share/pitrac/templates/
+    cp "$SCRIPT_DIR/templates/activemq.xml.template" /usr/share/pitrac/templates/ 2>/dev/null || true
+    cp "$SCRIPT_DIR/templates/log4j2.properties.template" /usr/share/pitrac/templates/ 2>/dev/null || true
+    cp "$SCRIPT_DIR/templates/activemq-options.template" /usr/share/pitrac/templates/ 2>/dev/null || true
+    
     cp "$SCRIPT_DIR/src/lib/service-install.sh" /usr/lib/pitrac/
     chmod 755 /usr/lib/pitrac/service-install.sh
+    
+    if [[ -f "$SCRIPT_DIR/src/lib/activemq-service-install.sh" ]]; then
+        cp "$SCRIPT_DIR/src/lib/activemq-service-install.sh" /usr/lib/pitrac/
+        chmod 755 /usr/lib/pitrac/activemq-service-install.sh
+    fi
     
     INSTALL_USER="${SUDO_USER:-$(whoami)}"
     log_info "Installing PiTrac service for user: $INSTALL_USER"
