@@ -305,6 +305,11 @@ build_dev() {
         fi
     done
 
+    # Configuration parsing tools
+    if ! dpkg -l | grep -q "^ii  yq"; then
+        missing_deps+=("yq")
+    fi
+
     # ActiveMQ message broker
     if ! dpkg -l | grep -q "^ii  activemq"; then
         missing_deps+=("activemq")
@@ -430,6 +435,8 @@ EOF
     # Install config templates (only if they don't exist)
     log_info "Installing configuration templates..."
     mkdir -p /etc/pitrac
+    mkdir -p /etc/pitrac/config
+    
     if [[ ! -f /etc/pitrac/pitrac.yaml ]]; then
         cp "$SCRIPT_DIR/templates/pitrac.yaml" /etc/pitrac/pitrac.yaml
     else
@@ -440,6 +447,16 @@ EOF
         cp "$SCRIPT_DIR/templates/golf_sim_config.json" /etc/pitrac/golf_sim_config.json
     else
         log_info "  golf_sim_config.json already exists, skipping"
+    fi
+    
+    if [[ -d "$SCRIPT_DIR/templates/config" ]]; then
+        if [[ ! -f /etc/pitrac/config/parameter-mappings.yaml ]]; then
+            cp "$SCRIPT_DIR/templates/config/parameter-mappings.yaml" /etc/pitrac/config/parameter-mappings.yaml
+            log_info "  parameter-mappings.yaml installed"
+        else
+            log_info "  parameter-mappings.yaml already exists, skipping"
+        fi
+        
     fi
 
     # Configure ActiveMQ

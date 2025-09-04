@@ -49,6 +49,12 @@ case "$1" in
             chmod 755 /etc/pitrac
             set_config_permissions "/etc/pitrac/pitrac.yaml"
             set_config_permissions "/etc/pitrac/golf_sim_config.json"
+            
+            if [ -d /etc/pitrac/config ]; then
+                chown -R root:root /etc/pitrac/config
+                chmod 755 /etc/pitrac/config
+                find /etc/pitrac/config -type f -exec chmod 644 {} \;
+            fi
         else
             chown root:root /etc/pitrac
             chmod 755 /etc/pitrac
@@ -57,6 +63,12 @@ case "$1" in
             if [ -f /etc/pitrac/golf_sim_config.json ]; then
                 chown root:root /etc/pitrac/golf_sim_config.json
                 chmod 644 /etc/pitrac/golf_sim_config.json
+            fi
+            
+            if [ -d /etc/pitrac/config ]; then
+                chown -R root:root /etc/pitrac/config
+                chmod 755 /etc/pitrac/config
+                find /etc/pitrac/config -type f -exec chmod 644 {} \;
             fi
         fi
 

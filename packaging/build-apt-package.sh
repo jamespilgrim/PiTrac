@@ -214,11 +214,8 @@ create_configs() {
     cp "$SCRIPT_DIR/templates/golf_sim_config.json" "$DEB_DIR/usr/share/pitrac/golf_sim_config.json.default"
     
     if [[ -d "$SCRIPT_DIR/templates/config" ]]; then
-        cp "$SCRIPT_DIR/templates/config/settings-basic.yaml" "$DEB_DIR/etc/pitrac/config/"
-        cp "$SCRIPT_DIR/templates/config/settings-advanced.yaml" "$DEB_DIR/etc/pitrac/config/"
         cp "$SCRIPT_DIR/templates/config/parameter-mappings.yaml" "$DEB_DIR/etc/pitrac/config/"
-        cp "$SCRIPT_DIR/templates/config/README.md" "$DEB_DIR/etc/pitrac/config/"
-        log_info "Configuration templates installed"
+        log_info "Parameter mappings installed"
     else
         log_warn "Configuration templates not found in $SCRIPT_DIR/templates/config/"
     fi
@@ -270,8 +267,8 @@ Version: $VERSION
 Architecture: $ARCH
 Maintainer: $MAINTAINER
 Installed-Size: $size
-Depends: libc6 (>= 2.36), libstdc++6 (>= 12), libgcc-s1 (>= 12), libcamera0.0.3, libcamera-dev, libcamera-tools, rpicam-apps, libboost-system1.74.0, libboost-thread1.74.0, libboost-program-options1.74.0, libboost-filesystem1.74.0, libboost-log1.74.0, libboost-regex1.74.0, libboost-timer1.74.0, libfmt9, libssl3, libtbb12, libgstreamer1.0-0, libgstreamer-plugins-base1.0-0, libgtk-3-0, libavcodec59, libavformat59, libswscale6, libopenexr-3-1-30, libavutil57, libavdevice59, libexif12, libjpeg62-turbo, libtiff6, libpng16-16, libdrm2, libx11-6, libepoxy0, libqt5core5a, libqt5widgets5, libqt5gui5, libapr1, libaprutil1, libuuid1, activemq, default-jre-headless | openjdk-17-jre-headless, gpiod, net-tools, python3, python3-opencv, python3-numpy, python3-yaml
-Recommends: maven, yq
+Depends: libc6 (>= 2.36), libstdc++6 (>= 12), libgcc-s1 (>= 12), libcamera0.0.3, libcamera-dev, libcamera-tools, rpicam-apps, libboost-system1.74.0, libboost-thread1.74.0, libboost-program-options1.74.0, libboost-filesystem1.74.0, libboost-log1.74.0, libboost-regex1.74.0, libboost-timer1.74.0, libfmt9, libssl3, libtbb12, libgstreamer1.0-0, libgstreamer-plugins-base1.0-0, libgtk-3-0, libavcodec59, libavformat59, libswscale6, libopenexr-3-1-30, libavutil57, libavdevice59, libexif12, libjpeg62-turbo, libtiff6, libpng16-16, libdrm2, libx11-6, libepoxy0, libqt5core5a, libqt5widgets5, libqt5gui5, libapr1, libaprutil1, libuuid1, activemq, default-jre-headless | openjdk-17-jre-headless, gpiod, net-tools, python3, python3-opencv, python3-numpy, python3-yaml, yq
+Recommends: maven
 Section: misc
 Priority: optional
 Homepage: https://github.com/jamespilgrim/PiTrac
