@@ -348,14 +348,26 @@ install_python_dependencies() {
     
     log_info "Installing Python dependencies for web server..."
     
-    if pip3 install -r "$web_server_dir/requirements.txt" --break-system-packages 2>/dev/null; then
-        log_success "Python dependencies installed successfully"
-    elif pip3 install -r "$web_server_dir/requirements.txt" 2>/dev/null; then
-        log_success "Python dependencies installed successfully"
+    if [[ $EUID -eq 0 ]]; then
+        if pip3 install -r "$web_server_dir/requirements.txt" --break-system-packages 2>/dev/null; then
+            log_success "Python dependencies installed successfully"
+        elif pip3 install -r "$web_server_dir/requirements.txt" 2>/dev/null; then
+            log_success "Python dependencies installed successfully"
+        else
+            log_error "Failed to install Python dependencies"
+            log_info "Try manually: pip3 install -r $web_server_dir/requirements.txt --break-system-packages"
+            return 1
+        fi
     else
-        log_error "Failed to install Python dependencies"
-        log_info "Try manually: pip3 install -r $web_server_dir/requirements.txt"
-        return 1
+        if sudo pip3 install -r "$web_server_dir/requirements.txt" --break-system-packages 2>/dev/null; then
+            log_success "Python dependencies installed successfully"
+        elif sudo pip3 install -r "$web_server_dir/requirements.txt" 2>/dev/null; then
+            log_success "Python dependencies installed successfully"
+        else
+            log_error "Failed to install Python dependencies"
+            log_info "Try manually: sudo pip3 install -r $web_server_dir/requirements.txt --break-system-packages"
+            return 1
+        fi
     fi
     
     return 0

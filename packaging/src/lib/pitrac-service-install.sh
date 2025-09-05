@@ -145,3 +145,33 @@ verify_service_health() {
     echo "Service configuration verified successfully"
     return 0
 }
+
+if [[ "${BASH_SOURCE[0]}" == "${0}" ]] && [[ "${0}" == *"pitrac-service-install.sh" ]]; then
+    action="${1:-}"
+    user="${2:-}"
+    
+    case "$action" in
+        install)
+            install_pitrac_service "$user"
+            ;;
+        update-user)
+            update_service_user "$user"
+            ;;
+        uninstall)
+            uninstall_pitrac_service
+            ;;
+        verify)
+            verify_service_health
+            ;;
+        *)
+            echo "Usage: $0 {install|update-user|uninstall|verify} [username]"
+            echo ""
+            echo "Actions:"
+            echo "  install [user]    - Install PiTrac service for specified user"
+            echo "  update-user [user] - Update service to run as different user"
+            echo "  uninstall         - Remove PiTrac service"
+            echo "  verify            - Verify service configuration"
+            exit 1
+            ;;
+    esac
+fi

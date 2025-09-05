@@ -463,18 +463,14 @@ EOF
     if command -v activemq &>/dev/null || [[ -f /usr/share/activemq/bin/activemq ]]; then
         log_info "Configuring ActiveMQ using template system..."
         
-        if [[ ! -f /usr/share/pitrac/templates/activemq.xml.template ]]; then
-            mkdir -p /usr/share/pitrac/templates
-            cp "$SCRIPT_DIR/templates/activemq.xml.template" /usr/share/pitrac/templates/
-            cp "$SCRIPT_DIR/templates/log4j2.properties.template" /usr/share/pitrac/templates/
-            cp "$SCRIPT_DIR/templates/activemq-options.template" /usr/share/pitrac/templates/
-        fi
+        mkdir -p /usr/share/pitrac/templates
+        cp "$SCRIPT_DIR/templates/activemq.xml.template" /usr/share/pitrac/templates/
+        cp "$SCRIPT_DIR/templates/log4j2.properties.template" /usr/share/pitrac/templates/
+        cp "$SCRIPT_DIR/templates/activemq-options.template" /usr/share/pitrac/templates/
         
-        if [[ ! -f /usr/lib/pitrac/activemq-service-install.sh ]]; then
-            mkdir -p /usr/lib/pitrac
-            cp "$SCRIPT_DIR/src/lib/activemq-service-install.sh" /usr/lib/pitrac/
-            chmod 755 /usr/lib/pitrac/activemq-service-install.sh
-        fi
+        mkdir -p /usr/lib/pitrac
+        cp "$SCRIPT_DIR/src/lib/activemq-service-install.sh" /usr/lib/pitrac/
+        chmod 755 /usr/lib/pitrac/activemq-service-install.sh
         
         log_info "Installing ActiveMQ configuration..."
         if /usr/lib/pitrac/activemq-service-install.sh install activemq; then

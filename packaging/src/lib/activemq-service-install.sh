@@ -293,3 +293,29 @@ verify_activemq_config() {
         return 1
     fi
 }
+
+if [[ "${BASH_SOURCE[0]}" == "${0}" ]] && [[ "${0}" == *"activemq-service-install.sh" ]]; then
+    action="${1:-}"
+    user="${2:-activemq}"
+    
+    case "$action" in
+        install)
+            install_activemq_config "$user"
+            ;;
+        update)
+            update_activemq_config "$user"
+            ;;
+        verify)
+            verify_activemq_config
+            ;;
+        *)
+            echo "Usage: $0 {install|update|verify} [username]"
+            echo ""
+            echo "Actions:"
+            echo "  install [user]    - Install ActiveMQ configuration"
+            echo "  update [user]     - Update ActiveMQ configuration"
+            echo "  verify            - Verify ActiveMQ configuration"
+            exit 1
+            ;;
+    esac
+fi

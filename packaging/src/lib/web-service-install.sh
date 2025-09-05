@@ -125,3 +125,33 @@ verify_web_service() {
         return 1
     fi
 }
+
+if [[ "${BASH_SOURCE[0]}" == "${0}" ]] && [[ "${0}" == *"web-service-install.sh" ]]; then
+    action="${1:-}"
+    user="${2:-}"
+    
+    case "$action" in
+        install)
+            install_web_service "$user"
+            ;;
+        update-user)
+            update_web_service_user "$user"
+            ;;
+        uninstall)
+            uninstall_web_service
+            ;;
+        verify)
+            verify_web_service
+            ;;
+        *)
+            echo "Usage: $0 {install|update-user|uninstall|verify} [username]"
+            echo ""
+            echo "Actions:"
+            echo "  install [user]    - Install web service for specified user"
+            echo "  update-user [user] - Update service to run as different user"
+            echo "  uninstall         - Remove web service"
+            echo "  verify            - Verify service configuration"
+            exit 1
+            ;;
+    esac
+fi
