@@ -25,6 +25,22 @@ fi
 install_pitrac_service() {
     local install_user="${1:-$(whoami)}"
     
+    log_info "Cleaning up any existing PiTrac processes..."
+    
+    if pgrep -f "pitrac_lm" > /dev/null 2>&1; then
+        log_warn "Found existing pitrac_lm processes, stopping them..."
+        pkill -f "pitrac_lm" 2>/dev/null || true
+        sleep 1
+    fi
+    
+    if [[ -f /var/run/pitrac/pitrac.pid ]]; then
+        log_info "Removing stale PID file..."
+        sudo rm -f /var/run/pitrac/pitrac.pid 2>/dev/null || true
+    fi
+    
+    sudo mkdir -p /var/run/pitrac
+    sudo chown "$install_user:$install_user" /var/run/pitrac 2>/dev/null || true
+    
     if ! install_service_from_template "pitrac" "$install_user"; then
         log_error "Failed to install PiTrac service"
         return 1
@@ -93,6 +109,15 @@ uninstall_pitrac_service() {
         sudo systemctl disable pitrac 2>/dev/null || true
     fi
     
+    if pgrep -f "pitrac_lm" > /dev/null 2>&1; then
+        echo "Stopping remaining pitrac_lm processes..."
+        pkill -f "pitrac_lm" 2>/dev/null || true
+    fi
+    
+    if [[ -f /var/run/pitrac/pitrac.pid ]]; then
+        sudo rm -f /var/run/pitrac/pitrac.pid 2>/dev/null || true
+    fi
+    
     if [[ -f "/etc/systemd/system/pitrac.service" ]]; then
         echo "Removing service file..."
         sudo rm -f "/etc/systemd/system/pitrac.service"
@@ -146,6 +171,9 @@ verify_service_health() {
     return 0
 }
 
+# Main execution block - handle command line arguments
+# Only run if called directly, not when included in pitrac main script
+# Check if the script name ends with pitrac-service-install.sh
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]] && [[ "${0}" == *"pitrac-service-install.sh" ]]; then
     action="${1:-}"
     user="${2:-}"
